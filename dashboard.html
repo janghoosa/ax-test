@@ -256,7 +256,7 @@
       color: var(--muted);
     }
 
-    .hint-list, .metric-grid, .incident-list, .simple-list, .evidence-list, .detail-list, .report-preview {
+    .hint-list, .metric-grid, .incident-list, .simple-list, .evidence-list, .detail-list {
       display: grid;
       gap: 12px;
     }
@@ -524,52 +524,6 @@
       line-height: 1.6;
     }
 
-    .report-preview {
-      padding: 2px 0;
-    }
-
-    .report-block {
-      border-radius: 18px;
-      border: 1px solid var(--line);
-      background: var(--panel-2);
-      padding: 18px;
-    }
-
-    .report-block h3 {
-      font-size: 18px;
-      letter-spacing: -.02em;
-      margin-bottom: 10px;
-    }
-
-    .report-block p {
-      color: var(--muted);
-      line-height: 1.65;
-      font-size: 14px;
-    }
-
-    .report-cover {
-      padding: 22px;
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, var(--accent-soft), transparent 65%), var(--panel-2);
-    }
-
-    .report-cover .title {
-      margin-top: 14px;
-      font-size: 30px;
-      font-weight: 800;
-      letter-spacing: -.04em;
-    }
-
-    .report-meta {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 10px 16px;
-      margin-top: 18px;
-      color: var(--muted);
-      font-size: 14px;
-    }
-
     .foot {
       margin-top: 18px;
       color: var(--muted);
@@ -628,7 +582,6 @@
             <button class="btn primary" id="loadSampleBtn">현재 `access-logs.csv` 불러오기</button>
             <button class="btn" id="exportCsvBtn">필터 결과 CSV</button>
             <button class="btn" id="exportPdfBtn">PDF 다운로드</button>
-            <button class="btn" id="exportReportPdfBtn">공식 보고서 PDF</button>
             <button class="btn" id="themeBtn">다크 모드</button>
           </div>
         </div>
@@ -805,16 +758,6 @@
         </div>
         <div class="simple-list" id="actionsList"></div>
       </div>
-
-      <div class="panel span-12">
-        <div class="section-head">
-          <div>
-            <h2>공식 보고서 미리보기</h2>
-            <p>이사회와 경영진 제출용 문서를 화면에서 바로 확인하고 PDF로 저장할 수 있습니다.</p>
-          </div>
-        </div>
-        <div class="report-preview" id="reportPreview"></div>
-      </div>
     </section>
   </div>
 
@@ -825,13 +768,13 @@
       sqli: "SQL Injection",
       credential: "Credential Stuffing",
       traversal: "Directory Traversal",
-      insider: "내부자 위협"
+      insider: "민감정보 대량 추출"
     };
     const typeColor = {
       sqli: "var(--critical)",
       credential: "var(--high)",
       traversal: "var(--medium)",
-      insider: "var(--high)"
+      insider: "var(--low)"
     };
 
     const state = {
@@ -871,7 +814,6 @@
       loadSampleBtn: document.getElementById("loadSampleBtn"),
       exportCsvBtn: document.getElementById("exportCsvBtn"),
       exportPdfBtn: document.getElementById("exportPdfBtn"),
-      exportReportPdfBtn: document.getElementById("exportReportPdfBtn"),
       themeBtn: document.getElementById("themeBtn"),
       statusBox: document.getElementById("statusBox"),
       errorBox: document.getElementById("errorBox"),
@@ -890,8 +832,7 @@
       timeChart: document.getElementById("timeChart"),
       noiseList: document.getElementById("noiseList"),
       evidenceList: document.getElementById("evidenceList"),
-      actionsList: document.getElementById("actionsList"),
-      reportPreview: document.getElementById("reportPreview")
+      actionsList: document.getElementById("actionsList")
     };
 
     function escapeHtml(value) {
@@ -917,14 +858,6 @@
 
     function normalizeKey(key) {
       return String(key || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-    }
-
-    function minuteWindowKey(value, stepMinutes = 15) {
-      const date = new Date(value);
-      if (Number.isNaN(date.getTime())) return "invalid";
-      const minutes = Math.floor(date.getUTCMinutes() / stepMinutes) * stepMinutes;
-      date.setUTCMinutes(minutes, 0, 0);
-      return date.toISOString().slice(0, 16);
     }
 
     function minuteKey(timestamp) {
@@ -1108,15 +1041,10 @@
             (/get|post/i.test(method) && sensitivePattern.test(path))
           )
         ) {
-          const insiderSeverity = (isLargeTransfer && isPrivilegedUser) || /ssn|salary|payroll|personal-info|finance|executive/i.test(path)
-            ? "critical"
-            : (isLargeTransfer || isPrivilegedUser)
-              ? "high"
-              : "medium";
           suspicious.push({
             ...base,
             type: "insider",
-            severity: insiderSeverity
+            severity: (isLargeTransfer || /ssn|salary|payroll|personal-info|finance|executive/i.test(path) || isPrivilegedUser) ? "high" : "medium"
           });
         }
       });
@@ -1134,16 +1062,16 @@
       if (incident.type === "traversal") {
         return "파일 다운로드 경로를 악용해 시스템 파일에 접근하려는 시도입니다. 차단되더라도 표적화 자체가 위험 신호입니다.";
       }
-      return "특권 계정 또는 일반 계정이 민감 데이터를 대량 조회하거나 export했습니다. 정상 권한이 있어도 범위와 용량이 비정상적이면 즉시 조사해야 합니다.";
+      return "민감정보 export가 짧은 시간 안에 반복되었습니다. 정상 권한이 있어도 시간대, 범위, 용량이 비정상적이면 조사 대상입니다.";
     }
 
     function summarizeIncidents(suspicious) {
       const grouped = new Map();
       suspicious.forEach((item) => {
         const key = item.type === "credential"
-          ? "credential:" + minuteWindowKey(item.timestamp, 15) + ":" + (isPrivateIp(item.source_ip) ? item.source_ip : item.source_ip.split(".").slice(0, 3).join("."))
+          ? "credential:external"
           : item.type === "insider"
-            ? "insider:" + (item.user_id || item.source_ip) + ":" + minuteWindowKey(item.timestamp, 60)
+            ? "insider:" + (item.user_id || item.source_ip)
             : item.type + ":" + item.source_ip;
 
         if (!grouped.has(key)) {
@@ -1195,43 +1123,19 @@
     function buildMetrics(rows, suspicious, incidents) {
       const highRisk = incidents.filter((item) => severityWeight[item.severity] >= severityWeight.high).length;
       const impacted = new Set();
-      const exportBytes = suspicious
-        .filter((item) => item.type === "insider" && /\/export|employees|salary|payroll|personal-info|compensation|ssn|finance|executive/i.test(item.path))
-        .reduce((sum, item) => sum + Number(item.bytes || 0), 0);
       suspicious.forEach((item) => {
         if (item.type === "credential" && item.status_code === "200") impacted.add(item.source_ip + ":login-success");
         if (item.user_id && item.user_id !== "-") impacted.add(item.user_id);
       });
+      const exportBytes = incidents.filter((item) => item.type === "insider").reduce((sum, item) => sum + item.bytes, 0);
       return [
         { label: "전체 로그", number: formatNumber(rows.length), note: "빈 행과 중복 행을 정리한 뒤의 유효 로그 수입니다." },
         { label: "의심 이벤트", number: formatNumber(suspicious.length), note: "자동 규칙으로 추린 조사 대상 로그 수입니다." },
         { label: "고위험 사건", number: formatNumber(highRisk), note: "Critical 또는 High로 본 사건 수입니다." },
         { label: "노출 가능 계정/주체", number: formatNumber(impacted.size), note: "로그인 성공 또는 민감 데이터 export와 연관된 주체 수입니다." },
-        { label: "민감 데이터 반출", number: formatBytes(exportBytes), note: "민감 경로 접근과 export 계열 요청에서 계산한 총 전송량입니다." },
+        { label: "민감 데이터 반출", number: formatBytes(exportBytes), note: "export 계열 요청에서 계산한 총 전송량입니다." },
         { label: "사건 그룹", number: formatNumber(incidents.length), note: "개별 로그를 묶어 경영진이 보기 쉬운 단위로 정리한 수입니다." }
       ];
-    }
-
-    function getCredentialCampaigns(incidents) {
-      return incidents
-        .filter((item) => item.type === "credential")
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 3)
-        .map((item) => ({
-          title: item.title,
-          count: item.count,
-          window: shortTime(item.start) + " ~ " + shortTime(item.end),
-          summary: item.ips.length > 1
-            ? item.ips.length + "개 IP에서 반복된 로그인 시도"
-            : (item.ips[0] || "-") + "에서 반복된 로그인 시도"
-        }));
-    }
-
-    function getPrivilegedAccessIncidents(incidents) {
-      return incidents
-        .filter((item) => item.type === "insider" && item.bytes >= 150000)
-        .sort((a, b) => b.bytes - a.bytes)
-        .slice(0, 3);
     }
 
     function getTypeCounts(incidents) {
@@ -1364,9 +1268,7 @@
         ["시간", shortTime(incident.start) + " ~ " + shortTime(incident.end)],
         ["주요 IP", incident.ips.join(", ") || "-"],
         ["계정", incident.users.join(", ") || "-"],
-        ["대표 경로", incident.paths.slice(0, 3).join(" / ") || "-"],
-        ["누적 용량", formatBytes(incident.bytes)],
-        ["상태 코드", Object.entries(incident.statusCounts).map(([code, count]) => code + "x" + count).join(", ") || "-"]
+        ["대표 경로", incident.paths.slice(0, 3).join(" / ") || "-"]
       ];
       elements.detailView.innerHTML = rows.map(([title, detail]) => (
         '<div class="detail-item"><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(detail) + "</small></div>"
@@ -1488,23 +1390,14 @@
 
     function renderActions() {
       const actions = [];
-      const privileged = getPrivilegedAccessIncidents(state.filteredIncidents);
       if (state.filteredIncidents.some((item) => item.type === "sqli")) {
         actions.push(["외부 공격 IP 차단", "SQL Injection과 Directory Traversal에 사용된 IP를 우선 차단하고 WAF 룰을 상향합니다."]);
       }
       if (state.filteredIncidents.some((item) => item.type === "credential")) {
-        const campaigns = getCredentialCampaigns(state.filteredIncidents);
-        const note = campaigns.length
-          ? campaigns[0].summary + "가 확인됐습니다. 로그인 성공이 확인된 계정과 유사 계정군에 대해 강제 비밀번호 변경과 세션 종료를 수행합니다."
-          : "로그인 성공이 확인된 계정과 유사 계정군에 대해 강제 비밀번호 변경과 세션 종료를 수행합니다.";
-        actions.push(["비밀번호 초기화와 세션 무효화", note]);
+        actions.push(["비밀번호 초기화와 세션 무효화", "로그인 성공이 확인된 계정과 유사 계정군에 대해 강제 비밀번호 변경과 세션 종료를 수행합니다."]);
       }
       if (state.filteredIncidents.some((item) => item.type === "insider")) {
-        const lead = privileged[0];
-        const note = lead
-          ? (lead.users[0] || lead.ips[0] || "해당 계정") + "의 대용량 민감 데이터 접근(" + formatBytes(lead.bytes) + ")이 확인됐습니다. 사용자, VPN 원접속지, MFA 여부, 단말 정보, 최근 권한 변경 이력을 즉시 확인합니다."
-          : "해당 사용자, VPN 원접속지, MFA 여부, 단말 정보, 최근 권한 변경 이력을 확인합니다.";
-        actions.push(["특권 계정 및 민감 export 조사", note]);
+        actions.push(["민감 export 계정 조사", "해당 사용자, VPN 원접속지, MFA 여부, 단말 정보, 최근 권한 변경 이력을 확인합니다."]);
       }
       if (!actions.length) {
         actions.push(["추가 조사 필요", "현재 필터 기준에서는 명확한 고위험 패턴이 적습니다. 파일 범위와 컬럼 구성을 다시 확인해 주세요."]);
@@ -1512,86 +1405,6 @@
       elements.actionsList.innerHTML = actions.map(([title, note]) => (
         '<div class="simple-item"><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(note) + "</small></div>"
       )).join("");
-    }
-
-    function buildExecutiveReportSections() {
-      const metrics = buildMetrics(state.rows, state.filteredSuspicious, state.filteredIncidents);
-      const topTypes = getTypeCounts(state.filteredIncidents).sort((a, b) => b.count - a.count);
-      const topIps = getTopIps(state.filteredSuspicious).slice(0, 5);
-      const totalSensitiveBytes = metrics.find((item) => item.label === "민감 데이터 반출");
-      const top = state.filteredIncidents[0];
-      const hasSqli = state.filteredIncidents.some((item) => item.type === "sqli");
-      const hasCredential = state.filteredIncidents.some((item) => item.type === "credential");
-      const hasTraversal = state.filteredIncidents.some((item) => item.type === "traversal");
-      const hasInsider = state.filteredIncidents.some((item) => item.type === "insider");
-      const executiveSummary = top
-        ? "2026년 4월 3일 새벽, 외부 공격자는 웹 취약점을 통해 관리자 권한 탈취 가능성을 만들었고, 이어 분산 로그인 공격으로 일반 계정 8개를 탈취한 정황이 확인되었습니다. 같은 시점에 내부 권한 계정 emp_0142를 이용한 인사 데이터 대량 추출이 발생해 개인정보 및 급여정보 노출 가능성이 존재합니다. 이번 사고는 단순 해킹 시도가 아니라 인증, 권한, 탐지 체계 전반의 구조적 취약점을 드러낸 사건입니다. 즉시 계정 보호와 법적 대응이 필요하며, 6개월 내 제로트러스트 전환 착수가 필요합니다."
-        : "현재 필터 기준으로 공식 보고서를 생성할 수 있을 만큼 충분한 사건이 선택되지 않았습니다. 전체 데이터를 기준으로 다시 확인해 주세요.";
-      const incidentOverview = [
-        hasSqli ? "SQL Injection(입력값 조작으로 시스템을 속이는 공격)으로 관리자 API가 노출되었고 관리자 계정 1개 탈취 가능성이 확인되었습니다." : "",
-        hasCredential ? "Credential Stuffing(유출된 계정 정보를 반복 입력하는 공격)으로 일반 계정 8개 탈취 정황이 있습니다." : "",
-        hasTraversal ? "Directory Traversal(정상 경로를 벗어나 내부 파일에 접근하려는 공격)은 웹 애플리케이션 방화벽이 차단했습니다." : "",
-        hasInsider ? "내부자 emp_0142가 인사 데이터와 급여정보를 대량 추출했고, 총 반출량은 " + (totalSensitiveBytes ? totalSensitiveBytes.number : "0B") + " 수준으로 집계됩니다." : ""
-      ].filter(Boolean).join(" ");
-      const businessImpact = "비즈니스 영향은 개인정보 및 급여정보 노출 가능성, 개인정보보호법상 신고와 통지 검토 필요성, 임직원 및 이해관계자 신뢰 저하, 추가 조사와 규제 대응 비용 증가입니다.";
-      const rootCause = "기술적 근본 원인은 parameterized query 미적용, 로그인 API rate limiting 부재, MFA 미적용, 과도한 권한 부여, UEBA 부재, API 인증 토큰 만료 시간이 24시간으로 과도하게 긴 점입니다. 조직적 원인으로는 보안 코드 리뷰 부재, 접근 권한 정기 감사 미실시, 보안 교육 및 탐지 운영 성숙도 부족이 확인됩니다.";
-      const response = "즉시 실행 조치는 관리자 포함 탈취 의심 계정 전체 비밀번호 강제 리셋, 활성 세션 및 인증 토큰 전체 무효화, 공격자 IP 차단, emp_0142 계정 임시 정지 및 포렌식 조사 착수입니다.";
-      const forensic = "후속 조치는 실제 유출 데이터 범위 확정, 개인정보보호위원회 신고 필요성 판단, 영향받은 직원 통지 계획 수립, 법률팀과의 상시 연계, 서버 로그·DB 감사 로그·VPN 로그·다운로드 기록 포렌식 보존입니다.";
-      const prevention = "재발 방지 대책은 단기 1주 내 WAF 룰 강화·Rate Limiting 적용·MFA 강제, 중기 1개월 내 코드 보안 감사·권한 체계 재설계·SIEM 고도화, 장기 6개월 내 제로트러스트 전환·보안 교육 프로그램·정기 모의 침투 테스트 운영입니다.";
-      const zeroTrust = "제로트러스트의 핵심은 Never Trust, Always Verify입니다. 기존 경계형 보안은 내부망을 상대적으로 신뢰했지만, 제로트러스트는 내부 이동까지 포함해 사용자 신원, 단말 상태, 권한, 맥락을 계속 검증합니다. 마이크로세그멘테이션은 HR, 관리자, 일반 업무 시스템을 세분화해 침투 후 확산을 막는 핵심 원칙입니다.";
-      const roadmap = "구현 단계는 Phase 1(1~2개월) ID 기반 접근통제와 MFA·토큰 수명 단축, Phase 2(3~4개월) 마이크로세그멘테이션과 ZTNA 적용, Phase 3(5~6개월) UEBA/XDR 연계 및 지속적 검증 자동화입니다.";
-      const stack = "권장 기술 스택은 IAM + IdP(예: Okta, Azure AD), ZTNA와 네트워크 세그멘테이션(예: Zscaler, Cloudflare Access), SASE/SD-WAN, UEBA/XDR, WAF/API 보안, PAM, DLP입니다.";
-      const budget = "예산 범위는 IdP/SSO/MFA 연 3천만~8천만 원, SIEM 및 로그 저장 연 5천만~1.5억 원, ZTNA 연 4천만~1억 원, EDR/XDR 연 4천만~1억 원, PAM 연 3천만~8천만 원, 컨설팅·구축 1회 5천만~2억 원, 교육 및 모의훈련 연 1천만~3천만 원 수준입니다.";
-      const staffing = "필요 인력은 보안 아키텍트 1명, IAM/IdP 엔지니어 1명, 보안 운영 분석가 1~2명, 인프라·네트워크 엔지니어 1명, 애플리케이션 보안 담당 1명이며, 초기 전환 단계에서는 외부 컨설턴트 병행이 필요합니다.";
-      const approvals = "경영진 승인 요청은 긴급 대응 예산, 계정 리셋과 세션 무효화 등 즉시 조치, 6개월 제로트러스트 전환 계획, 보안 인력 및 외부 컨설팅 예산입니다.";
-      const conclusion = "이번 사고는 외부 웹 공격, 분산 로그인 공격, 내부 민감정보 대량 접근이 연결된 복합 사고입니다. 문제는 공격 자체보다 왜 이를 막지 못했는가에 있으며, 인증 강화·최소 권한·이상행위 탐지·짧은 토큰 수명·코드 보안 통제가 함께 보완되어야 합니다.";
-
-      return {
-        cover: {
-          title: "보안 사고 대응 보고서 및 제로트러스트 전환 계획",
-          meta: [
-            ["작성일", "2026년 4월 3일"],
-            ["작성 부서", "정보보호실 보안대응팀"],
-            ["보고 대상", "CISO, CEO, 경영진, 이사회"],
-            ["문서 등급", "내부용"],
-            ["문서 버전", "v1.1"],
-            ["기준 파일", state.fileName || "-"]
-          ]
-        },
-        sections: [
-          { title: "1. Executive Summary", body: executiveSummary },
-          { title: "2. 사고 개요 및 비즈니스 영향", body: incidentOverview + " " + businessImpact },
-          { title: "3. 기술 분석 및 침투 경로", body: "공격 벡터는 SQL Injection, Credential Stuffing, Directory Traversal, 내부자 또는 탈취 계정 기반 민감정보 접근입니다. 침투 흐름은 SQL Injection → admin 계정 탈취 가능성 → 일반 계정 8개 탈취 → 내부 시스템 추가 탐색 → emp_0142 계정 기반 인사 데이터 대량 추출 순으로 해석됩니다. 영향 범위는 관리자 계정 1개 가능성, 일반 계정 8개, 급여 및 개인정보 " + (totalSensitiveBytes ? totalSensitiveBytes.number : "0B") + ", 주요 시간대는 02:15~04:30입니다." },
-          { title: "4. 근본 원인 분석", body: rootCause },
-          { title: "5. 즉각 대응 조치", body: response },
-          { title: "6. 포렌식·법적·대외 대응", body: forensic },
-          { title: "7. 재발 방지 대책", body: prevention },
-          { title: "8. 제로트러스트 전환 로드맵", body: zeroTrust + " " + stack + " " + roadmap },
-          { title: "9. 예산 및 인력 계획", body: budget + " " + staffing },
-          { title: "10. 경영진 승인 요청", body: approvals },
-          { title: "11. 결론", body: conclusion },
-          { title: "부록. 정량 지표", body: "핵심 지표: " + metrics.map((item) => item.label + " " + item.number).join(" / ") + " | 공격 유형 분포: " + topTypes.map((item) => typeLabel[item.type] + " " + formatNumber(item.count) + "건").join(" / ") + " | 상위 공격자 IP: " + topIps.map(([ip, count]) => ip + " " + count + "건").join(" / ") }
-        ]
-      };
-    }
-
-    function renderReportPreview() {
-      if (!state.filteredIncidents.length) {
-        elements.reportPreview.innerHTML = '<div class="empty">CSV를 업로드하면 공식 보고서 미리보기가 여기에 나타납니다.</div>';
-        return;
-      }
-      const report = buildExecutiveReportSections();
-      elements.reportPreview.innerHTML =
-        '<div class="report-cover">' +
-          '<div class="eyebrow">Board Report Preview</div>' +
-          '<div class="title">' + escapeHtml(report.cover.title) + '</div>' +
-          '<div class="report-meta">' +
-            report.cover.meta.map(([key, value]) => '<div><strong>' + escapeHtml(key) + '</strong><div style="color:var(--muted);margin-top:4px;">' + escapeHtml(value) + '</div></div>').join("") +
-          '</div>' +
-        '</div>' +
-        report.sections.map((section) => (
-          '<div class="report-block"><h3>' + escapeHtml(section.title) + '</h3><p>' + escapeHtml(section.body) + '</p></div>'
-        )).join("");
     }
 
     function renderTypeFilterOptions() {
@@ -1613,7 +1426,6 @@
       renderNoise();
       renderEvidence();
       renderActions();
-      renderReportPreview();
     }
 
     function ingestRows(rows, fileName) {
@@ -1645,46 +1457,21 @@
     }
 
     function buildPdf(summaryLines) {
-      const wrapLine = (line, width = 86) => {
-        const text = String(line || "");
-        if (!text) return [""];
-        const chunks = [];
-        for (let i = 0; i < text.length; i += width) {
-          chunks.push(text.slice(i, i + width));
-        }
-        return chunks;
-      };
-
-      const wrappedLines = summaryLines.flatMap((line) => wrapLine(line));
-      const linesPerPage = 36;
-      const pages = [];
-      for (let i = 0; i < wrappedLines.length; i += linesPerPage) {
-        pages.push(wrappedLines.slice(i, i + linesPerPage));
-      }
+      const safeLines = summaryLines.map((line) => String(line).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)"));
+      const commands = ["BT", "/F1 12 Tf", "50 790 Td"];
+      safeLines.forEach((line, index) => {
+        if (index > 0) commands.push("0 -18 Td");
+        commands.push("(" + line + ") Tj");
+      });
+      commands.push("ET");
+      const stream = commands.join("\n");
 
       const objects = [];
       objects.push("1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj");
-      const kids = [];
-      const pageCount = Math.max(pages.length, 1);
-      const fontObjectId = 3 + (pageCount * 2);
-      objects.push("2 0 obj<< /Type /Pages /Kids [" + Array.from({ length: pageCount }, (_, idx) => (3 + (idx * 2)) + " 0 R").join(" ") + "] /Count " + pageCount + " >>endobj");
-
-      pages.forEach((pageLines, index) => {
-        const pageObjectId = 3 + (index * 2);
-        const contentObjectId = pageObjectId + 1;
-        kids.push(pageObjectId + " 0 R");
-        const safeLines = pageLines.map((line) => String(line).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)"));
-        const commands = ["BT", "/F1 11 Tf", "48 794 Td"];
-        safeLines.forEach((line, lineIndex) => {
-          if (lineIndex > 0) commands.push("0 -20 Td");
-          commands.push("(" + line + ") Tj");
-        });
-        commands.push("ET");
-        const stream = commands.join("\n");
-        objects.push(pageObjectId + " 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 " + fontObjectId + " 0 R >> >> /Contents " + contentObjectId + " 0 R >>endobj");
-        objects.push(contentObjectId + " 0 obj<< /Length " + stream.length + " >>stream\n" + stream + "\nendstream\nendobj");
-      });
-      objects.push(fontObjectId + " 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj");
+      objects.push("2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj");
+      objects.push("3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>endobj");
+      objects.push("4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj");
+      objects.push("5 0 obj<< /Length " + stream.length + " >>stream\n" + stream + "\nendstream\nendobj");
 
       let pdf = "%PDF-1.4\n";
       const offsets = [0];
@@ -1735,90 +1522,38 @@
       const top = state.filteredIncidents[0];
       const metrics = buildMetrics(state.rows, state.filteredSuspicious, state.filteredIncidents);
       const topIps = getTopIps(state.filteredSuspicious).slice(0, 5);
-      const campaigns = getCredentialCampaigns(state.filteredIncidents);
-      const privileged = getPrivilegedAccessIncidents(state.filteredIncidents);
-      const typeSummary = getTypeCounts(state.filteredIncidents)
-        .sort((a, b) => b.count - a.count)
-        .map((item) => "- " + typeLabel[item.type] + ": " + formatNumber(item.count) + "건");
-      const actions = [];
-      if (state.filteredIncidents.some((item) => item.type === "sqli" || item.type === "traversal")) {
-        actions.push("- 외부 공격 IP 차단 및 WAF 차단 규칙 상향");
-      }
-      if (campaigns.length) {
-        actions.push("- Credential Stuffing 캠페인 기준으로 성공 로그인 계정 비밀번호 초기화 및 세션 무효화");
-      }
-      if (privileged.length) {
-        actions.push("- 특권 또는 민감 데이터 접근 계정의 MFA, VPN 접속지, 단말, 권한 변경 이력 긴급 점검");
-      }
       const incidentLines = state.filteredIncidents.slice(0, 6).map((item, idx) =>
-        (idx + 1) + ". " + item.title + " / " + severityLabel[item.severity] + " / " + item.count + " logs / " + (item.ips[0] || "-") + " / " + formatBytes(item.bytes)
-      );
-      const evidenceLines = top.evidence.slice(0, 5).map((item, idx) =>
-        (idx + 1) + ". " + shortTime(item.timestamp) + " / " + item.source_ip + " / " + item.path + " / status " + item.status_code
+        (idx + 1) + ". " + item.title + " / " + severityLabel[item.severity] + " / " + item.count + " logs / " + (item.ips[0] || "-")
       );
       const lines = [
-        "Security Dashboard Executive Summary",
+        "Security Dashboard Summary",
         "File: " + (state.fileName || "-"),
-        "Generated: " + new Date().toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).replace(" ", "T") + "+09:00",
+        "Generated: " + new Date().toISOString(),
         "",
         "Key Metrics",
         ...metrics.map((item) => "- " + item.label + ": " + item.number),
-        "",
-        "Threat Mix",
-        ...typeSummary,
         "",
         "Top Incident",
         "Top incident: " + top.title + " / " + severityLabel[top.severity],
         "Time window: " + shortTime(top.start) + " - " + shortTime(top.end),
         "IPs: " + (top.ips.join(", ") || "-"),
-        "Users: " + (top.users.join(", ") || "-"),
-        "Transfer: " + formatBytes(top.bytes)
+        "Users: " + (top.users.join(", ") || "-")
       ];
       if (incidentLines.length) {
         lines.push("", "Incident Summary", ...incidentLines);
       }
-      if (campaigns.length) {
-        lines.push("", "Credential Stuffing Campaigns", ...campaigns.map((item, idx) => (idx + 1) + ". " + item.summary + " / " + item.window + " / " + formatNumber(item.count) + "건"));
-      }
-      if (privileged.length) {
-        lines.push("", "Privileged Or Bulk Sensitive Access", ...privileged.map((item, idx) => (idx + 1) + ". " + (item.users.join(", ") || item.ips.join(", ")) + " / " + formatBytes(item.bytes) + " / " + item.paths.slice(0, 2).join(" | ")));
-      }
       if (topIps.length) {
         lines.push("", "Top IPs", ...topIps.map(([ip, count]) => "- " + ip + ": " + count));
       }
-      if (evidenceLines.length) {
-        lines.push("", "Representative Evidence", ...evidenceLines);
-      }
-      lines.push("", "Actions", ...(actions.length ? actions : ["- Review filtered incidents and validate access context immediately"]));
+      lines.push(
+        "",
+        "Actions",
+        "- Block malicious external IPs and tighten WAF rules",
+        "- Reset passwords and invalidate sessions for successful login events",
+        "- Review privileged or bulk sensitive-data access immediately"
+      );
       const blob = buildPdf(lines);
       downloadBlob(blob, (state.fileName || "security") + "-summary.pdf");
-    }
-
-    function exportExecutiveReportPdf() {
-      if (!state.filteredIncidents.length) {
-        setError("공식 보고서 PDF로 내보낼 데이터가 없습니다. 먼저 CSV를 업로드해 주세요.");
-        return;
-      }
-      const report = buildExecutiveReportSections();
-      const lines = [
-        "[Board Report]",
-        report.cover.title,
-        "작성일: 2026-04-03",
-        "작성 부서: 정보보호실 보안대응팀",
-        "보고 대상: CISO, CEO, 경영진, 이사회",
-        "문서 등급: 내부용",
-        "문서 버전: v1.0",
-        "기준 파일: " + (state.fileName || "-"),
-        "",
-        "목차",
-        ...report.sections.map((section, idx) => (idx + 1) + ". " + section.title.replace(/^\d+\.\s*/, "")),
-        ""
-      ];
-      report.sections.forEach((section) => {
-        lines.push(section.title, section.body, "");
-      });
-      const blob = buildPdf(lines);
-      downloadBlob(blob, (state.fileName || "security") + "-executive-report.pdf");
     }
 
     function downloadBlob(blob, fileName) {
@@ -1858,7 +1593,6 @@
       elements.noiseList.innerHTML = '<div class="empty">정상/노이즈 분리 결과가 여기에 나타납니다.</div>';
       elements.evidenceList.innerHTML = '<div class="empty">대표 근거가 여기에 나타납니다.</div>';
       elements.actionsList.innerHTML = '<div class="empty">즉시 대응 권고가 여기에 나타납니다.</div>';
-      elements.reportPreview.innerHTML = '<div class="empty">CSV를 업로드하면 공식 보고서 미리보기가 여기에 나타납니다.</div>';
     }
 
     elements.fileInput.addEventListener("change", async (event) => {
@@ -1892,7 +1626,6 @@
     elements.loadSampleBtn.addEventListener("click", loadSample);
     elements.exportCsvBtn.addEventListener("click", exportCsv);
     elements.exportPdfBtn.addEventListener("click", exportPdf);
-    elements.exportReportPdfBtn.addEventListener("click", exportExecutiveReportPdf);
     elements.themeBtn.addEventListener("click", () => elements.body.classList.toggle("dark"));
 
     elements.typeFilter.addEventListener("change", (event) => {
