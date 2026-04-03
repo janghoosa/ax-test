@@ -8,17 +8,17 @@
     :root {
       --bg: #f5efe5;
       --bg2: #e7dcc8;
-      --panel: rgba(255, 252, 247, 0.86);
+      --panel: rgba(255, 252, 247, 0.88);
       --panel2: #fffdf9;
       --text: #172027;
       --muted: #5d6972;
       --line: rgba(23, 32, 39, 0.1);
       --accent: #0d6273;
       --accent-soft: rgba(13, 98, 115, 0.12);
-      --critical: #b42318;
-      --high: #e56b2d;
       --shadow: 0 20px 70px rgba(53, 40, 18, 0.12);
     }
+
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -30,10 +30,8 @@
         linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
     }
 
-    * { box-sizing: border-box; }
-
     .page {
-      width: min(1180px, calc(100% - 32px));
+      width: min(1100px, calc(100% - 32px));
       margin: 18px auto 48px;
     }
 
@@ -128,63 +126,16 @@
     }
 
     .span-12 { grid-column: span 12; }
-    .span-8 { grid-column: span 8; }
-    .span-4 { grid-column: span 4; }
 
-    .section-head {
-      display: flex;
-      justify-content: space-between;
-      gap: 12px;
-      align-items: end;
-      margin-bottom: 18px;
-    }
-
-    .section-head p {
-      color: var(--muted);
-      font-size: 14px;
-      line-height: 1.5;
-    }
-
-    .dropzone, .card, .report-block, .message {
-      border-radius: 18px;
+    .report-cover, .report-block {
+      border-radius: 20px;
       border: 1px solid var(--line);
       background: var(--panel2);
     }
 
-    .dropzone, .message, .report-block, .card {
-      padding: 16px;
-    }
-
-    .dropzone {
-      background: linear-gradient(180deg, var(--accent-soft), transparent), var(--panel2);
-      border-style: dashed;
-    }
-
-    .dropzone strong, .card strong {
-      display: block;
-      font-size: 16px;
-    }
-
-    .dropzone p, .card small, .message small, .report-block p {
-      color: var(--muted);
-      line-height: 1.55;
-    }
-
-    .dropzone input[type="file"] {
-      margin-top: 14px;
-      width: 100%;
-    }
-
-    .stack {
-      display: grid;
-      gap: 12px;
-    }
-
     .report-cover {
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: linear-gradient(180deg, var(--accent-soft), transparent 65%), var(--panel2);
       padding: 22px;
+      background: linear-gradient(180deg, var(--accent-soft), transparent 65%), var(--panel2);
     }
 
     .report-title {
@@ -203,11 +154,27 @@
       font-size: 14px;
     }
 
-    .toc {
-      display: grid;
-      gap: 8px;
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .section-head p {
       color: var(--muted);
       font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .report-stack {
+      display: grid;
+      gap: 12px;
+    }
+
+    .report-block {
+      padding: 18px;
     }
 
     .report-block h3 {
@@ -216,29 +183,18 @@
       margin-bottom: 10px;
     }
 
-    .report-block p {
+    .report-block p, .toc {
+      color: var(--muted);
+      line-height: 1.65;
       font-size: 14px;
     }
 
-    .error {
-      background: rgba(180,35,24,.08);
-      border-color: rgba(180,35,24,.35);
-    }
-
-    .empty {
-      border-radius: 18px;
-      border: 1px dashed var(--line);
-      background: var(--panel2);
-      color: var(--muted);
-      padding: 22px;
-      line-height: 1.6;
+    .toc {
+      display: grid;
+      gap: 8px;
     }
 
     @media (max-width: 980px) {
-      .span-8, .span-4 {
-        grid-column: span 12;
-      }
-
       .meta-grid {
         grid-template-columns: 1fr;
       }
@@ -246,7 +202,7 @@
 
     @media print {
       body { background: white; }
-      .toolbar, .dropzone, #errorBox { display: none !important; }
+      .toolbar { display: none !important; }
       .hero, .panel { box-shadow: none; border: 1px solid #ddd; }
     }
   </style>
@@ -256,84 +212,100 @@
     <section class="hero">
       <span class="eyebrow">Board Report</span>
       <h1>보안 사고 대응 보고서 및 제로트러스트 전환 계획</h1>
-      <p>대시보드는 그대로 두고, 이 페이지는 이사회/경영진 제출용 공식 문서 전용 화면입니다. CSV를 올리면 정량 지표를 반영해 보고서 본문과 PDF가 함께 생성됩니다.</p>
+      <p>이 페이지는 대시보드와 분리된 정적 보고서입니다. 이사회와 경영진 제출용 본문만 담고 있으며, 같은 내용으로 PDF 다운로드가 가능합니다.</p>
       <div class="toolbar">
-        <button class="btn primary" id="loadSampleBtn">현재 `access-logs.csv` 불러오기</button>
-        <button class="btn" id="downloadPdfBtn">공식 보고서 PDF</button>
+        <button class="btn primary" id="downloadPdfBtn">공식 보고서 PDF</button>
         <button class="btn" id="openDashboardBtn">대시보드로 돌아가기</button>
       </div>
     </section>
 
     <section class="grid">
-      <div class="panel span-4">
+      <div class="panel span-12">
         <div class="section-head">
           <div>
-            <h2>입력</h2>
-            <p>같은 CSV를 다시 올리면 보고서 내용이 갱신됩니다.</p>
+            <h2>문서 본문</h2>
+            <p>CSV 입력 없이 고정된 제출용 문서입니다.</p>
           </div>
         </div>
-        <div class="stack">
-          <div class="dropzone">
-            <strong>CSV 업로드</strong>
-            <p>`timestamp/time`, `source_ip/src_ip`, `path/url/url_path`, `status/status_code/response_code`를 자동 인식합니다.</p>
-            <input type="file" id="fileInput" accept=".csv,text/csv">
-          </div>
-          <div class="message" id="statusBox">
-            <strong>대기 중</strong>
-            <small>파일을 선택하거나 샘플 불러오기를 눌러 시작하세요.</small>
-          </div>
-          <div class="message error" id="errorBox" hidden>
-            <strong>파일을 읽지 못했습니다</strong>
-            <small id="errorText">CSV 형식을 확인해 주세요.</small>
-          </div>
-          <div class="card">
-            <strong>문서 범위</strong>
-            <small>Executive Summary, 공격 개요, 기술 분석, 근본 원인, 즉각 조치, 법적 대응, 재발 방지, 제로트러스트 로드맵, 예산/인력, 결론까지 포함합니다.</small>
-          </div>
-        </div>
-      </div>
-
-      <div class="panel span-8">
-        <div class="section-head">
-          <div>
-            <h2>문서 미리보기</h2>
-            <p>이 미리보기와 동일한 내용이 PDF로 내려갑니다.</p>
-          </div>
-        </div>
-        <div id="reportRoot" class="stack">
-          <div class="empty">CSV를 업로드하면 공식 보고서가 여기에 생성됩니다.</div>
-        </div>
+        <div class="report-stack" id="reportRoot"></div>
       </div>
     </section>
   </div>
 
   <script>
-    const aliases = {
-      timestamp: ["timestamp", "time", "event_time", "datetime", "date_time", "occurred_at"],
-      source_ip: ["source_ip", "src_ip", "client_ip", "ip", "sourceip", "remote_addr"],
-      dest_ip: ["dest_ip", "destination_ip", "server_ip", "dst_ip"],
-      dest_port: ["dest_port", "destination_port", "dst_port", "port"],
-      protocol: ["protocol", "proto", "scheme"],
-      method: ["method", "http_method", "verb"],
-      path: ["path", "url", "url_path", "uri", "request", "request_path", "endpoint"],
-      status_code: ["status_code", "status", "http_status", "response_code"],
-      user_agent: ["user_agent", "ua", "agent", "browser"],
-      bytes: ["bytes", "bytes_sent", "response_bytes", "size"],
-      user_id: ["user_id", "user", "account", "employee_id", "userid"]
+    const report = {
+      cover: {
+        title: "보안 사고 대응 보고서 및 제로트러스트 전환 계획",
+        meta: [
+          ["작성일", "2026년 4월 3일"],
+          ["작성 부서", "정보보호실 보안대응팀"],
+          ["보고 대상", "CISO, CEO, 경영진, 이사회"],
+          ["문서 등급", "내부용"],
+          ["문서 버전", "v1.1"]
+        ]
+      },
+      toc: [
+        "1. Executive Summary",
+        "2. 사고 개요 및 비즈니스 영향",
+        "3. 기술 분석 및 침투 경로",
+        "4. 근본 원인 분석",
+        "5. 즉각 대응 조치",
+        "6. 포렌식·법적·대외 대응",
+        "7. 재발 방지 대책",
+        "8. 제로트러스트 전환 로드맵",
+        "9. 예산 및 인력 계획",
+        "10. 경영진 승인 요청",
+        "11. 결론"
+      ],
+      sections: [
+        {
+          title: "1. Executive Summary",
+          body: "2026년 4월 3일 새벽, 외부 공격자는 웹 취약점을 통해 관리자 권한 탈취 가능성을 만들었고, 이어 분산 로그인 공격으로 일반 계정 8개를 탈취한 정황이 확인되었습니다. 같은 시점에 내부 권한 계정 emp_0142를 이용한 인사 데이터 대량 추출이 발생해 개인정보 및 급여정보 노출 가능성이 존재합니다. 이번 사고는 단순 해킹 시도가 아니라 인증, 권한, 탐지 체계 전반의 구조적 취약점을 드러낸 사건입니다. 즉시 계정 보호와 법적 대응이 필요하며, 6개월 내 제로트러스트 전환 착수가 필요합니다."
+        },
+        {
+          title: "2. 사고 개요 및 비즈니스 영향",
+          body: "확인된 공격은 SQL Injection, Credential Stuffing, Directory Traversal, 내부자 또는 탈취 계정 기반 민감정보 접근입니다. 비즈니스 영향은 개인정보 및 급여정보 노출 가능성, 개인정보보호법상 신고·통지 검토 필요성, 임직원 및 이해관계자 신뢰 저하, 규제 대응 및 조사 비용 증가입니다."
+        },
+        {
+          title: "3. 기술 분석 및 침투 경로",
+          body: "공격 벡터는 SQL Injection(입력값 조작 공격), Credential Stuffing(유출 계정정보 재사용 공격), Directory Traversal(시스템 내부 파일 접근 시도), 내부자 또는 탈취 계정 기반 민감정보 접근입니다. 침투 흐름은 SQL Injection → 관리자 계정 탈취 가능성 → 일반 계정 8개 탈취 → 내부 시스템 추가 탐색 → emp_0142 계정 기반 인사 데이터 대량 추출 순으로 해석됩니다. 영향 범위는 관리자 계정 1개 가능성, 일반 계정 8개, 급여 및 개인정보 약 16.7MB, 주요 시간대는 02:15~04:30입니다."
+        },
+        {
+          title: "4. 근본 원인 분석",
+          body: "기술적 근본 원인은 parameterized query 미적용, 로그인 API rate limiting 부재, MFA 미적용, 과도한 권한 부여, UEBA 부재, API 인증 토큰 만료 시간이 24시간으로 과도하게 긴 점입니다. 조직적 원인은 보안 코드 리뷰 부재, 접근 권한 정기 감사 미실시, 보안 교육 부족, 탐지 운영 성숙도 미흡입니다."
+        },
+        {
+          title: "5. 즉각 대응 조치",
+          body: "즉시 실행 조치는 관리자 포함 탈취 의심 계정 전체 비밀번호 강제 리셋, 활성 세션 및 인증 토큰 전체 무효화, 공격자 IP 차단, emp_0142 계정 임시 정지 및 포렌식 조사 착수입니다."
+        },
+        {
+          title: "6. 포렌식·법적·대외 대응",
+          body: "실제 유출 데이터 범위 확정, 개인정보보호위원회 신고 필요성 판단, 영향받은 직원 통지 계획 수립, 법률팀과의 상시 연계, 서버 로그·DB 감사 로그·VPN 로그·다운로드 기록 포렌식 보존이 필요합니다."
+        },
+        {
+          title: "7. 재발 방지 대책",
+          body: "단기 1주 내 WAF 룰 강화, Rate Limiting 적용, MFA 강제를 완료해야 합니다. 중기 1개월 내 코드 보안 감사, 권한 체계 재설계, SIEM 고도화를 수행하고, 장기 6개월 내 제로트러스트 전환, 보안 교육 프로그램, 정기 모의 침투 테스트를 정례화해야 합니다."
+        },
+        {
+          title: "8. 제로트러스트 전환 로드맵",
+          body: "제로트러스트의 핵심은 Never Trust, Always Verify입니다. 기존 경계형 보안은 내부망을 상대적으로 신뢰했지만, 제로트러스트는 내부 이동까지 포함해 사용자 신원, 단말 상태, 권한, 맥락을 계속 검증합니다. Phase 1(1~2개월)은 ID 기반 접근통제와 MFA·토큰 수명 단축, Phase 2(3~4개월)는 마이크로세그멘테이션과 ZTNA 적용, Phase 3(5~6개월)는 UEBA/XDR 연계와 지속적 검증 자동화입니다. 권장 기술 스택은 IAM + IdP(Okta, Azure AD), ZTNA(Zscaler, Cloudflare Access), SASE/SD-WAN, UEBA/XDR, PAM, DLP입니다."
+        },
+        {
+          title: "9. 예산 및 인력 계획",
+          body: "예산 범위는 IdP/SSO/MFA 연 3천만~8천만 원, SIEM 및 로그 저장 연 5천만~1.5억 원, ZTNA 연 4천만~1억 원, EDR/XDR 연 4천만~1억 원, PAM 연 3천만~8천만 원, 컨설팅·구축 1회 5천만~2억 원, 교육 및 모의훈련 연 1천만~3천만 원 수준입니다. 필요 인력은 보안 아키텍트 1명, IAM/IdP 엔지니어 1명, 보안 운영 분석가 1~2명, 인프라·네트워크 엔지니어 1명, 애플리케이션 보안 담당 1명입니다."
+        },
+        {
+          title: "10. 경영진 승인 요청",
+          body: "긴급 대응 예산, 계정 리셋과 세션 무효화 등 즉시 조치, 6개월 제로트러스트 전환 계획, 보안 인력 및 외부 컨설팅 예산에 대한 승인이 필요합니다."
+        },
+        {
+          title: "11. 결론",
+          body: "이번 사고는 외부 웹 공격, 분산 로그인 공격, 내부 민감정보 대량 접근이 연결된 복합 사고입니다. 문제는 공격 자체보다 왜 이를 막지 못했는가에 있으며, 인증 강화·최소 권한·이상행위 탐지·짧은 토큰 수명·코드 보안 통제가 함께 보완되어야 합니다."
+        }
+      ]
     };
 
-    const state = { rows: [], fileName: "" };
-
-    const elements = {
-      fileInput: document.getElementById("fileInput"),
-      loadSampleBtn: document.getElementById("loadSampleBtn"),
-      downloadPdfBtn: document.getElementById("downloadPdfBtn"),
-      openDashboardBtn: document.getElementById("openDashboardBtn"),
-      statusBox: document.getElementById("statusBox"),
-      errorBox: document.getElementById("errorBox"),
-      errorText: document.getElementById("errorText"),
-      reportRoot: document.getElementById("reportRoot")
-    };
+    const reportRoot = document.getElementById("reportRoot");
 
     function escapeHtml(value) {
       return String(value)
@@ -344,180 +316,8 @@
         .replaceAll("'", "&#39;");
     }
 
-    function formatNumber(value) {
-      return new Intl.NumberFormat("ko-KR").format(Number(value || 0));
-    }
-
-    function formatBytes(value) {
-      const n = Number(value || 0);
-      if (!Number.isFinite(n) || n <= 0) return "0B";
-      if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + "MB";
-      if (n >= 1024) return Math.round(n / 1024) + "KB";
-      return n + "B";
-    }
-
-    function setStatus(title, detail) {
-      elements.statusBox.innerHTML = "<strong>" + escapeHtml(title) + "</strong><small>" + escapeHtml(detail) + "</small>";
-    }
-
-    function setError(message) {
-      elements.errorText.textContent = message;
-      elements.errorBox.hidden = false;
-    }
-
-    function clearError() {
-      elements.errorBox.hidden = true;
-    }
-
-    function normalizeKey(key) {
-      return String(key || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
-    }
-
-    function parseCsv(text) {
-      const rows = [];
-      let row = [];
-      let cell = "";
-      let inQuotes = false;
-      for (let i = 0; i < text.length; i += 1) {
-        const char = text[i];
-        const next = text[i + 1];
-        if (char === '"') {
-          if (inQuotes && next === '"') {
-            cell += '"';
-            i += 1;
-          } else {
-            inQuotes = !inQuotes;
-          }
-          continue;
-        }
-        if (char === "," && !inQuotes) {
-          row.push(cell);
-          cell = "";
-          continue;
-        }
-        if ((char === "\n" || char === "\r") && !inQuotes) {
-          if (char === "\r" && next === "\n") i += 1;
-          row.push(cell);
-          if (row.some((item) => item.trim() !== "")) rows.push(row);
-          row = [];
-          cell = "";
-          continue;
-        }
-        cell += char;
-      }
-      if (cell.length || row.length) {
-        row.push(cell);
-        if (row.some((item) => item.trim() !== "")) rows.push(row);
-      }
-      return rows;
-    }
-
-    function mapHeaders(headerRow) {
-      const normalized = headerRow.map(normalizeKey);
-      const mapped = {};
-      Object.entries(aliases).forEach(([target, names]) => {
-        const index = normalized.findIndex((item) => names.includes(item));
-        if (index >= 0) mapped[target] = index;
-      });
-      return mapped;
-    }
-
-    function toObjects(matrix) {
-      if (!matrix.length) throw new Error("CSV에 데이터가 없습니다.");
-      const headerMap = mapHeaders(matrix[0]);
-      if (headerMap.timestamp === undefined || headerMap.source_ip === undefined || headerMap.path === undefined || headerMap.status_code === undefined) {
-        throw new Error("필수 컬럼이 부족합니다. timestamp/time, source_ip/src_ip, path/url/url_path, status/status_code/response_code가 필요합니다.");
-      }
-      const dedupe = new Set();
-      const rows = [];
-      for (let i = 1; i < matrix.length; i += 1) {
-        const source = matrix[i];
-        const record = {};
-        Object.keys(aliases).forEach((field) => {
-          record[field] = headerMap[field] !== undefined ? String(source[headerMap[field]] || "").trim() : "";
-        });
-        if (!record.path || !record.source_ip) continue;
-        record.status_code = String(record.status_code || "").replace(/[^\d]/g, "");
-        record.bytes = Number(record.bytes) || 0;
-        const fingerprint = [record.timestamp, record.source_ip, record.path, record.status_code, record.user_id].join("|");
-        if (dedupe.has(fingerprint)) continue;
-        dedupe.add(fingerprint);
-        rows.push(record);
-      }
-      if (!rows.length) throw new Error("유효한 데이터 행이 없습니다.");
-      return rows;
-    }
-
-    function buildSummary(rows) {
-      const hasSqli = rows.some((row) => /union\s+select|drop\s+table|or\s+1=1|sqlmap|extractvalue|sleep\(/i.test(row.path + " " + row.user_agent));
-      const credentialRows = rows.filter((row) => /\/api\/auth\/login|\/login|\/signin/i.test(row.path));
-      const traversalRows = rows.filter((row) => /download|file/i.test(row.path) && /(\.\.\/|%2e%2e|etc\/passwd|id_rsa|shadow)/i.test(row.path));
-      const insiderRows = rows.filter((row) => row.user_id && /emp_0142|db_admin_park/i.test(row.user_id) || /salary|payroll|personal-info|employees|compensation|ssn|executive|finance/i.test(row.path));
-      const successfulCredential = credentialRows.filter((row) => row.status_code === "200");
-      const exportBytes = insiderRows.reduce((sum, row) => sum + Number(row.bytes || 0), 0);
-
-      return {
-        totalRows: rows.length,
-        hasSqli,
-        credentialAttempts: credentialRows.length,
-        credentialSuccess: successfulCredential.length || 8,
-        traversalAttempts: traversalRows.length,
-        insiderRows: insiderRows.length,
-        exportBytes,
-        topAttackers: Array.from(rows.reduce((map, row) => {
-          if (!row.source_ip) return map;
-          map.set(row.source_ip, (map.get(row.source_ip) || 0) + 1);
-          return map;
-        }, new Map()).entries()).sort((a, b) => b[1] - a[1]).slice(0, 5)
-      };
-    }
-
-    function buildReport(rows, fileName) {
-      const summary = buildSummary(rows);
-      return {
-        cover: {
-          title: "보안 사고 대응 보고서 및 제로트러스트 전환 계획",
-          meta: [
-            ["작성일", "2026년 4월 3일"],
-            ["작성 부서", "정보보호실 보안대응팀"],
-            ["보고 대상", "CISO, CEO, 경영진, 이사회"],
-            ["문서 등급", "내부용"],
-            ["문서 버전", "v1.1"],
-            ["기준 파일", fileName || "-"]
-          ]
-        },
-        toc: [
-          "1. Executive Summary",
-          "2. 사고 개요 및 비즈니스 영향",
-          "3. 기술 분석 및 침투 경로",
-          "4. 근본 원인 분석",
-          "5. 즉각 대응 조치",
-          "6. 포렌식·법적·대외 대응",
-          "7. 재발 방지 대책",
-          "8. 제로트러스트 전환 로드맵",
-          "9. 예산 및 인력 계획",
-          "10. 경영진 승인 요청",
-          "11. 결론"
-        ],
-        sections: [
-          { title: "1. Executive Summary", body: "2026년 4월 3일 새벽, 외부 공격자는 웹 취약점을 통해 관리자 권한 탈취 가능성을 만들었고, 이어 분산 로그인 공격으로 일반 계정 8개를 탈취한 정황이 확인되었습니다. 같은 시점에 내부 권한 계정 emp_0142를 이용한 인사 데이터 대량 추출이 발생해 개인정보 및 급여정보 노출 가능성이 존재합니다. 이번 사고는 단순 해킹 시도가 아니라 인증, 권한, 탐지 체계 전반의 구조적 취약점을 드러낸 사건입니다. 즉시 계정 보호와 법적 대응이 필요하며, 6개월 내 제로트러스트 전환 착수가 필요합니다." },
-          { title: "2. 사고 개요 및 비즈니스 영향", body: "확인된 공격은 SQL Injection, Credential Stuffing, Directory Traversal, 내부자 또는 탈취 계정 기반 민감정보 접근입니다. 비즈니스 영향은 개인정보 및 급여정보 노출 가능성, 개인정보보호법상 신고·통지 검토 필요성, 임직원 및 이해관계자 신뢰 저하, 규제 대응 및 조사 비용 증가입니다. 현재 집계 기준 민감 데이터 접근량은 " + formatBytes(summary.exportBytes) + "입니다." },
-          { title: "3. 기술 분석 및 침투 경로", body: "공격 흐름은 SQL Injection → 관리자 계정 탈취 가능성 → Credential Stuffing으로 일반 계정 8개 탈취 → Directory Traversal 탐색 → emp_0142 계정 기반 인사 데이터 대량 추출 순으로 해석됩니다. Directory Traversal은 웹 애플리케이션 방화벽이 차단했으나, 내부 이동 가능성과 민감 데이터 접근은 실질적 리스크로 판단됩니다." },
-          { title: "4. 근본 원인 분석", body: "기술적 근본 원인은 parameterized query 미적용, 로그인 API rate limiting 부재, MFA 미적용, 과도한 권한 부여, UEBA 부재, API 인증 토큰 만료 시간이 24시간으로 과도하게 긴 점입니다. 조직적 원인은 보안 코드 리뷰 부재, 접근 권한 정기 감사 미실시, 보안 교육 부족, 탐지 운영 성숙도 미흡입니다." },
-          { title: "5. 즉각 대응 조치", body: "즉시 실행 조치는 관리자 포함 탈취 의심 계정 전체 비밀번호 강제 리셋, 활성 세션 및 인증 토큰 전체 무효화, 공격자 IP 차단, emp_0142 계정 임시 정지 및 포렌식 조사 착수입니다." },
-          { title: "6. 포렌식·법적·대외 대응", body: "실제 유출 데이터 범위 확정, 개인정보보호위원회 신고 필요성 판단, 영향받은 직원 통지 계획 수립, 법률팀과의 상시 연계, 서버 로그·DB 감사 로그·VPN 로그·다운로드 기록 포렌식 보존이 필요합니다." },
-          { title: "7. 재발 방지 대책", body: "단기 1주 내 WAF 룰 강화, Rate Limiting 적용, MFA 강제를 완료해야 합니다. 중기 1개월 내 코드 보안 감사, 권한 체계 재설계, SIEM 고도화를 수행하고, 장기 6개월 내 제로트러스트 전환, 보안 교육 프로그램, 정기 모의 침투 테스트를 정례화해야 합니다." },
-          { title: "8. 제로트러스트 전환 로드맵", body: "제로트러스트의 핵심은 Never Trust, Always Verify입니다. 기존 경계형 보안은 내부망을 상대적으로 신뢰했지만, 제로트러스트는 내부 이동까지 포함해 사용자 신원, 단말 상태, 권한, 맥락을 계속 검증합니다. Phase 1(1~2개월)은 ID 기반 접근통제와 MFA·토큰 수명 단축, Phase 2(3~4개월)는 마이크로세그멘테이션과 ZTNA 적용, Phase 3(5~6개월)는 UEBA/XDR 연계와 지속적 검증 자동화입니다. 권장 기술 스택은 IAM + IdP(Okta, Azure AD), ZTNA(Zscaler, Cloudflare Access), SASE/SD-WAN, UEBA/XDR, PAM, DLP입니다." },
-          { title: "9. 예산 및 인력 계획", body: "예산 범위는 IdP/SSO/MFA 연 3천만~8천만 원, SIEM 및 로그 저장 연 5천만~1.5억 원, ZTNA 연 4천만~1억 원, EDR/XDR 연 4천만~1억 원, PAM 연 3천만~8천만 원, 컨설팅·구축 1회 5천만~2억 원, 교육 및 모의훈련 연 1천만~3천만 원 수준입니다. 필요 인력은 보안 아키텍트 1명, IAM/IdP 엔지니어 1명, 보안 운영 분석가 1~2명, 인프라·네트워크 엔지니어 1명, 애플리케이션 보안 담당 1명입니다." },
-          { title: "10. 경영진 승인 요청", body: "긴급 대응 예산, 계정 리셋과 세션 무효화 등 즉시 조치, 6개월 제로트러스트 전환 계획, 보안 인력 및 외부 컨설팅 예산에 대한 승인이 필요합니다." },
-          { title: "11. 결론", body: "이번 사고는 외부 웹 공격, 분산 로그인 공격, 내부 민감정보 대량 접근이 연결된 복합 사고입니다. 문제는 공격 자체보다 왜 이를 막지 못했는가에 있으며, 인증 강화·최소 권한·이상행위 탐지·짧은 토큰 수명·코드 보안 통제가 함께 보완되어야 합니다." }
-        ],
-        appendix: "참고 지표: 전체 유효 로그 " + formatNumber(summary.totalRows) + "건 / Credential Stuffing 시도 " + formatNumber(summary.credentialAttempts) + "건 / 성공 추정 " + formatNumber(summary.credentialSuccess) + "건 / Directory Traversal 시도 " + formatNumber(summary.traversalAttempts) + "건 / 민감 접근 로그 " + formatNumber(summary.insiderRows) + "건 / 상위 공격자 IP " + summary.topAttackers.map(([ip, count]) => ip + " " + count + "건").join(" / ")
-      };
-    }
-
-    function renderReport(report) {
-      elements.reportRoot.innerHTML =
+    function renderReport() {
+      reportRoot.innerHTML =
         '<div class="report-cover">' +
           '<div class="eyebrow">Board Submission Draft</div>' +
           '<div class="report-title">' + escapeHtml(report.cover.title) + '</div>' +
@@ -526,8 +326,7 @@
           '</div>' +
         '</div>' +
         '<div class="report-block"><h3>목차</h3><div class="toc">' + report.toc.map((item) => '<div>' + escapeHtml(item) + '</div>').join("") + '</div></div>' +
-        report.sections.map((section) => '<div class="report-block"><h3>' + escapeHtml(section.title) + '</h3><p>' + escapeHtml(section.body) + '</p></div>').join("") +
-        '<div class="report-block"><h3>부록. 정량 지표</h3><p>' + escapeHtml(report.appendix) + '</p></div>';
+        report.sections.map((section) => '<div class="report-block"><h3>' + escapeHtml(section.title) + '</h3><p>' + escapeHtml(section.body) + '</p></div>').join("");
     }
 
     function buildPdf(lines) {
@@ -584,12 +383,7 @@
       URL.revokeObjectURL(url);
     }
 
-    function exportReportPdf() {
-      if (!state.rows.length) {
-        setError("PDF로 내보낼 데이터가 없습니다. 먼저 CSV를 업로드해 주세요.");
-        return;
-      }
-      const report = buildReport(state.rows, state.fileName);
+    function exportPdf() {
       const lines = [
         "[경영진 보고 문서]",
         report.cover.title,
@@ -602,55 +396,16 @@
       report.sections.forEach((section) => {
         lines.push(section.title, section.body, "");
       });
-      lines.push("부록. 정량 지표", report.appendix);
       const blob = buildPdf(lines);
-      downloadBlob(blob, (state.fileName || "security") + "-executive-report.pdf");
+      downloadBlob(blob, "security-executive-report.pdf");
     }
 
-    async function handleCsvText(text, fileName) {
-      try {
-        clearError();
-        setStatus("분석 중", fileName + "을 읽고 있습니다.");
-        const matrix = parseCsv(text);
-        const rows = toObjects(matrix);
-        state.rows = rows;
-        state.fileName = fileName;
-        renderReport(buildReport(rows, fileName));
-        setStatus(fileName + " 분석 완료", "유효 로그 " + formatNumber(rows.length) + "행을 기준으로 공식 보고서를 생성했습니다.");
-      } catch (error) {
-        setError(error.message || "CSV를 읽는 중 오류가 발생했습니다.");
-        setStatus("분석 실패", "파일 형식 또는 컬럼 구성을 확인해 주세요.");
-      }
-    }
-
-    async function loadSample() {
-      clearError();
-      try {
-        setStatus("샘플 불러오는 중", "같은 폴더의 access-logs.csv를 읽고 있습니다.");
-        const response = await fetch("./access-logs.csv");
-        if (!response.ok) throw new Error("샘플 CSV를 찾지 못했습니다.");
-        const text = await response.text();
-        await handleCsvText(text, "access-logs.csv");
-      } catch (error) {
-        setError("브라우저가 로컬 fetch를 막았거나 샘플 파일을 찾지 못했습니다. 직접 CSV를 업로드해 주세요.");
-        setStatus("샘플 자동 불러오기 실패", "파일 업로드로는 정상 동작합니다.");
-      }
-    }
-
-    elements.fileInput.addEventListener("change", async (event) => {
-      const file = event.target.files && event.target.files[0];
-      if (!file) return;
-      const text = await file.text();
-      await handleCsvText(text, file.name);
-    });
-
-    elements.loadSampleBtn.addEventListener("click", loadSample);
-    elements.downloadPdfBtn.addEventListener("click", exportReportPdf);
-    elements.openDashboardBtn.addEventListener("click", () => {
+    document.getElementById("downloadPdfBtn").addEventListener("click", exportPdf);
+    document.getElementById("openDashboardBtn").addEventListener("click", () => {
       window.location.href = "./index.html";
     });
 
-    loadSample();
+    renderReport();
   </script>
 </body>
 </html>
