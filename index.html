@@ -768,13 +768,13 @@
       sqli: "SQL Injection",
       credential: "Credential Stuffing",
       traversal: "Directory Traversal",
-      insider: "민감정보 대량 추출"
+      insider: "내부자 위협"
     };
     const typeColor = {
       sqli: "var(--critical)",
       credential: "var(--high)",
       traversal: "var(--medium)",
-      insider: "var(--low)"
+      insider: "var(--high)"
     };
 
     const state = {
@@ -858,6 +858,14 @@
 
     function normalizeKey(key) {
       return String(key || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+    }
+
+    function minuteWindowKey(value, stepMinutes = 15) {
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return "invalid";
+      const minutes = Math.floor(date.getUTCMinutes() / stepMinutes) * stepMinutes;
+      date.setUTCMinutes(minutes, 0, 0);
+      return date.toISOString().slice(0, 16);
     }
 
     function minuteKey(timestamp) {
@@ -1041,10 +1049,15 @@
             (/get|post/i.test(method) && sensitivePattern.test(path))
           )
         ) {
+          const insiderSeverity = (isLargeTransfer && isPrivilegedUser) || /ssn|salary|payroll|personal-info|finance|executive/i.test(path)
+            ? "critical"
+            : (isLargeTransfer || isPrivilegedUser)
+              ? "high"
+              : "medium";
           suspicious.push({
             ...base,
             type: "insider",
-            severity: (isLargeTransfer || /ssn|salary|payroll|personal-info|finance|executive/i.test(path) || isPrivilegedUser) ? "high" : "medium"
+            severity: insiderSeverity
           });
         }
       });
@@ -1062,16 +1075,16 @@
       if (incident.type === "traversal") {
         return "파일 다운로드 경로를 악용해 시스템 파일에 접근하려는 시도입니다. 차단되더라도 표적화 자체가 위험 신호입니다.";
       }
-      return "민감정보 export가 짧은 시간 안에 반복되었습니다. 정상 권한이 있어도 시간대, 범위, 용량이 비정상적이면 조사 대상입니다.";
+      return "특권 계정 또는 일반 계정이 민감 데이터를 대량 조회하거나 export했습니다. 정상 권한이 있어도 범위와 용량이 비정상적이면 즉시 조사해야 합니다.";
     }
 
     function summarizeIncidents(suspicious) {
       const grouped = new Map();
       suspicious.forEach((item) => {
         const key = item.type === "credential"
-          ? "credential:external"
+          ? "credential:" + minuteWindowKey(item.timestamp, 15) + ":" + (isPrivateIp(item.source_ip) ? item.source_ip : item.source_ip.split(".").slice(0, 3).join("."))
           : item.type === "insider"
-            ? "insider:" + (item.user_id || item.source_ip)
+            ? "insider:" + (item.user_id || item.source_ip) + ":" + minuteWindowKey(item.timestamp, 60)
             : item.type + ":" + item.source_ip;
 
         if (!grouped.has(key)) {
@@ -1123,19 +1136,43 @@
     function buildMetrics(rows, suspicious, incidents) {
       const highRisk = incidents.filter((item) => severityWeight[item.severity] >= severityWeight.high).length;
       const impacted = new Set();
+      const exportBytes = suspicious
+        .filter((item) => item.type === "insider" && /\/export|employees|salary|payroll|personal-info|compensation|ssn|finance|executive/i.test(item.path))
+        .reduce((sum, item) => sum + Number(item.bytes || 0), 0);
       suspicious.forEach((item) => {
         if (item.type === "credential" && item.status_code === "200") impacted.add(item.source_ip + ":login-success");
         if (item.user_id && item.user_id !== "-") impacted.add(item.user_id);
       });
-      const exportBytes = incidents.filter((item) => item.type === "insider").reduce((sum, item) => sum + item.bytes, 0);
       return [
         { label: "전체 로그", number: formatNumber(rows.length), note: "빈 행과 중복 행을 정리한 뒤의 유효 로그 수입니다." },
         { label: "의심 이벤트", number: formatNumber(suspicious.length), note: "자동 규칙으로 추린 조사 대상 로그 수입니다." },
         { label: "고위험 사건", number: formatNumber(highRisk), note: "Critical 또는 High로 본 사건 수입니다." },
         { label: "노출 가능 계정/주체", number: formatNumber(impacted.size), note: "로그인 성공 또는 민감 데이터 export와 연관된 주체 수입니다." },
-        { label: "민감 데이터 반출", number: formatBytes(exportBytes), note: "export 계열 요청에서 계산한 총 전송량입니다." },
+        { label: "민감 데이터 반출", number: formatBytes(exportBytes), note: "민감 경로 접근과 export 계열 요청에서 계산한 총 전송량입니다." },
         { label: "사건 그룹", number: formatNumber(incidents.length), note: "개별 로그를 묶어 경영진이 보기 쉬운 단위로 정리한 수입니다." }
       ];
+    }
+
+    function getCredentialCampaigns(incidents) {
+      return incidents
+        .filter((item) => item.type === "credential")
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3)
+        .map((item) => ({
+          title: item.title,
+          count: item.count,
+          window: shortTime(item.start) + " ~ " + shortTime(item.end),
+          summary: item.ips.length > 1
+            ? item.ips.length + "개 IP에서 반복된 로그인 시도"
+            : (item.ips[0] || "-") + "에서 반복된 로그인 시도"
+        }));
+    }
+
+    function getPrivilegedAccessIncidents(incidents) {
+      return incidents
+        .filter((item) => item.type === "insider" && item.bytes >= 150000)
+        .sort((a, b) => b.bytes - a.bytes)
+        .slice(0, 3);
     }
 
     function getTypeCounts(incidents) {
@@ -1268,7 +1305,9 @@
         ["시간", shortTime(incident.start) + " ~ " + shortTime(incident.end)],
         ["주요 IP", incident.ips.join(", ") || "-"],
         ["계정", incident.users.join(", ") || "-"],
-        ["대표 경로", incident.paths.slice(0, 3).join(" / ") || "-"]
+        ["대표 경로", incident.paths.slice(0, 3).join(" / ") || "-"],
+        ["누적 용량", formatBytes(incident.bytes)],
+        ["상태 코드", Object.entries(incident.statusCounts).map(([code, count]) => code + "x" + count).join(", ") || "-"]
       ];
       elements.detailView.innerHTML = rows.map(([title, detail]) => (
         '<div class="detail-item"><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(detail) + "</small></div>"
@@ -1390,14 +1429,23 @@
 
     function renderActions() {
       const actions = [];
+      const privileged = getPrivilegedAccessIncidents(state.filteredIncidents);
       if (state.filteredIncidents.some((item) => item.type === "sqli")) {
         actions.push(["외부 공격 IP 차단", "SQL Injection과 Directory Traversal에 사용된 IP를 우선 차단하고 WAF 룰을 상향합니다."]);
       }
       if (state.filteredIncidents.some((item) => item.type === "credential")) {
-        actions.push(["비밀번호 초기화와 세션 무효화", "로그인 성공이 확인된 계정과 유사 계정군에 대해 강제 비밀번호 변경과 세션 종료를 수행합니다."]);
+        const campaigns = getCredentialCampaigns(state.filteredIncidents);
+        const note = campaigns.length
+          ? campaigns[0].summary + "가 확인됐습니다. 로그인 성공이 확인된 계정과 유사 계정군에 대해 강제 비밀번호 변경과 세션 종료를 수행합니다."
+          : "로그인 성공이 확인된 계정과 유사 계정군에 대해 강제 비밀번호 변경과 세션 종료를 수행합니다.";
+        actions.push(["비밀번호 초기화와 세션 무효화", note]);
       }
       if (state.filteredIncidents.some((item) => item.type === "insider")) {
-        actions.push(["민감 export 계정 조사", "해당 사용자, VPN 원접속지, MFA 여부, 단말 정보, 최근 권한 변경 이력을 확인합니다."]);
+        const lead = privileged[0];
+        const note = lead
+          ? (lead.users[0] || lead.ips[0] || "해당 계정") + "의 대용량 민감 데이터 접근(" + formatBytes(lead.bytes) + ")이 확인됐습니다. 사용자, VPN 원접속지, MFA 여부, 단말 정보, 최근 권한 변경 이력을 즉시 확인합니다."
+          : "해당 사용자, VPN 원접속지, MFA 여부, 단말 정보, 최근 권한 변경 이력을 확인합니다.";
+        actions.push(["특권 계정 및 민감 export 조사", note]);
       }
       if (!actions.length) {
         actions.push(["추가 조사 필요", "현재 필터 기준에서는 명확한 고위험 패턴이 적습니다. 파일 범위와 컬럼 구성을 다시 확인해 주세요."]);
@@ -1457,21 +1505,46 @@
     }
 
     function buildPdf(summaryLines) {
-      const safeLines = summaryLines.map((line) => String(line).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)"));
-      const commands = ["BT", "/F1 12 Tf", "50 790 Td"];
-      safeLines.forEach((line, index) => {
-        if (index > 0) commands.push("0 -18 Td");
-        commands.push("(" + line + ") Tj");
-      });
-      commands.push("ET");
-      const stream = commands.join("\n");
+      const wrapLine = (line, width = 86) => {
+        const text = String(line || "");
+        if (!text) return [""];
+        const chunks = [];
+        for (let i = 0; i < text.length; i += width) {
+          chunks.push(text.slice(i, i + width));
+        }
+        return chunks;
+      };
+
+      const wrappedLines = summaryLines.flatMap((line) => wrapLine(line));
+      const linesPerPage = 36;
+      const pages = [];
+      for (let i = 0; i < wrappedLines.length; i += linesPerPage) {
+        pages.push(wrappedLines.slice(i, i + linesPerPage));
+      }
 
       const objects = [];
       objects.push("1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj");
-      objects.push("2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj");
-      objects.push("3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>endobj");
-      objects.push("4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj");
-      objects.push("5 0 obj<< /Length " + stream.length + " >>stream\n" + stream + "\nendstream\nendobj");
+      const kids = [];
+      const pageCount = Math.max(pages.length, 1);
+      const fontObjectId = 3 + (pageCount * 2);
+      objects.push("2 0 obj<< /Type /Pages /Kids [" + Array.from({ length: pageCount }, (_, idx) => (3 + (idx * 2)) + " 0 R").join(" ") + "] /Count " + pageCount + " >>endobj");
+
+      pages.forEach((pageLines, index) => {
+        const pageObjectId = 3 + (index * 2);
+        const contentObjectId = pageObjectId + 1;
+        kids.push(pageObjectId + " 0 R");
+        const safeLines = pageLines.map((line) => String(line).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)"));
+        const commands = ["BT", "/F1 11 Tf", "48 794 Td"];
+        safeLines.forEach((line, lineIndex) => {
+          if (lineIndex > 0) commands.push("0 -20 Td");
+          commands.push("(" + line + ") Tj");
+        });
+        commands.push("ET");
+        const stream = commands.join("\n");
+        objects.push(pageObjectId + " 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 " + fontObjectId + " 0 R >> >> /Contents " + contentObjectId + " 0 R >>endobj");
+        objects.push(contentObjectId + " 0 obj<< /Length " + stream.length + " >>stream\n" + stream + "\nendstream\nendobj");
+      });
+      objects.push(fontObjectId + " 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj");
 
       let pdf = "%PDF-1.4\n";
       const offsets = [0];
@@ -1522,36 +1595,61 @@
       const top = state.filteredIncidents[0];
       const metrics = buildMetrics(state.rows, state.filteredSuspicious, state.filteredIncidents);
       const topIps = getTopIps(state.filteredSuspicious).slice(0, 5);
+      const campaigns = getCredentialCampaigns(state.filteredIncidents);
+      const privileged = getPrivilegedAccessIncidents(state.filteredIncidents);
+      const typeSummary = getTypeCounts(state.filteredIncidents)
+        .sort((a, b) => b.count - a.count)
+        .map((item) => "- " + typeLabel[item.type] + ": " + formatNumber(item.count) + "건");
+      const actions = [];
+      if (state.filteredIncidents.some((item) => item.type === "sqli" || item.type === "traversal")) {
+        actions.push("- 외부 공격 IP 차단 및 WAF 차단 규칙 상향");
+      }
+      if (campaigns.length) {
+        actions.push("- Credential Stuffing 캠페인 기준으로 성공 로그인 계정 비밀번호 초기화 및 세션 무효화");
+      }
+      if (privileged.length) {
+        actions.push("- 특권 또는 민감 데이터 접근 계정의 MFA, VPN 접속지, 단말, 권한 변경 이력 긴급 점검");
+      }
       const incidentLines = state.filteredIncidents.slice(0, 6).map((item, idx) =>
-        (idx + 1) + ". " + item.title + " / " + severityLabel[item.severity] + " / " + item.count + " logs / " + (item.ips[0] || "-")
+        (idx + 1) + ". " + item.title + " / " + severityLabel[item.severity] + " / " + item.count + " logs / " + (item.ips[0] || "-") + " / " + formatBytes(item.bytes)
+      );
+      const evidenceLines = top.evidence.slice(0, 5).map((item, idx) =>
+        (idx + 1) + ". " + shortTime(item.timestamp) + " / " + item.source_ip + " / " + item.path + " / status " + item.status_code
       );
       const lines = [
-        "Security Dashboard Summary",
+        "Security Dashboard Executive Summary",
         "File: " + (state.fileName || "-"),
-        "Generated: " + new Date().toISOString(),
+        "Generated: " + new Date().toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }).replace(" ", "T") + "+09:00",
         "",
         "Key Metrics",
         ...metrics.map((item) => "- " + item.label + ": " + item.number),
+        "",
+        "Threat Mix",
+        ...typeSummary,
         "",
         "Top Incident",
         "Top incident: " + top.title + " / " + severityLabel[top.severity],
         "Time window: " + shortTime(top.start) + " - " + shortTime(top.end),
         "IPs: " + (top.ips.join(", ") || "-"),
-        "Users: " + (top.users.join(", ") || "-")
+        "Users: " + (top.users.join(", ") || "-"),
+        "Transfer: " + formatBytes(top.bytes)
       ];
       if (incidentLines.length) {
         lines.push("", "Incident Summary", ...incidentLines);
       }
+      if (campaigns.length) {
+        lines.push("", "Credential Stuffing Campaigns", ...campaigns.map((item, idx) => (idx + 1) + ". " + item.summary + " / " + item.window + " / " + formatNumber(item.count) + "건"));
+      }
+      if (privileged.length) {
+        lines.push("", "Privileged Or Bulk Sensitive Access", ...privileged.map((item, idx) => (idx + 1) + ". " + (item.users.join(", ") || item.ips.join(", ")) + " / " + formatBytes(item.bytes) + " / " + item.paths.slice(0, 2).join(" | ")));
+      }
       if (topIps.length) {
         lines.push("", "Top IPs", ...topIps.map(([ip, count]) => "- " + ip + ": " + count));
       }
-      lines.push(
-        "",
-        "Actions",
-        "- Block malicious external IPs and tighten WAF rules",
-        "- Reset passwords and invalidate sessions for successful login events",
-        "- Review privileged or bulk sensitive-data access immediately"
-      );
+      if (evidenceLines.length) {
+        lines.push("", "Representative Evidence", ...evidenceLines);
+      }
+      lines.push("", "Actions", ...(actions.length ? actions : ["- Review filtered incidents and validate access context immediately"]));
       const blob = buildPdf(lines);
       downloadBlob(blob, (state.fileName || "security") + "-summary.pdf");
     }
