@@ -212,9 +212,9 @@
     <section class="hero">
       <span class="eyebrow">Board Report</span>
       <h1>보안 사고 대응 보고서 및 제로트러스트 전환 계획</h1>
-      <p>이 페이지는 대시보드와 분리된 정적 보고서입니다. 이사회와 경영진 제출용 본문만 담고 있으며, 같은 내용으로 PDF 다운로드가 가능합니다.</p>
+      <p>이 페이지는 대시보드와 분리된 정적 보고서입니다. 이사회와 경영진 제출용 본문만 담고 있으며, 브라우저 인쇄 기능으로 PDF 저장이 가능합니다.</p>
       <div class="toolbar">
-        <button class="btn primary" id="downloadPdfBtn">공식 보고서 PDF</button>
+        <button class="btn primary" id="downloadPdfBtn">PDF 저장 / 인쇄</button>
         <button class="btn" id="openDashboardBtn">대시보드로 돌아가기</button>
       </div>
     </section>
@@ -224,7 +224,7 @@
         <div class="section-head">
           <div>
             <h2>문서 본문</h2>
-            <p>CSV 입력 없이 고정된 제출용 문서입니다.</p>
+            <p>CSV 입력 없이 고정된 제출용 문서입니다. PDF는 브라우저의 인쇄 기능을 사용합니다.</p>
           </div>
         </div>
         <div class="report-stack" id="reportRoot"></div>
@@ -329,75 +329,8 @@
         report.sections.map((section) => '<div class="report-block"><h3>' + escapeHtml(section.title) + '</h3><p>' + escapeHtml(section.body) + '</p></div>').join("");
     }
 
-    function buildPdf(lines) {
-      const wrapLine = (line, width = 86) => {
-        const text = String(line || "");
-        if (!text) return [""];
-        const chunks = [];
-        for (let i = 0; i < text.length; i += width) chunks.push(text.slice(i, i + width));
-        return chunks;
-      };
-      const wrappedLines = lines.flatMap((line) => wrapLine(line));
-      const linesPerPage = 36;
-      const pages = [];
-      for (let i = 0; i < wrappedLines.length; i += linesPerPage) pages.push(wrappedLines.slice(i, i + linesPerPage));
-      const objects = [];
-      objects.push("1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj");
-      const pageCount = Math.max(pages.length, 1);
-      const fontObjectId = 3 + (pageCount * 2);
-      objects.push("2 0 obj<< /Type /Pages /Kids [" + Array.from({ length: pageCount }, (_, idx) => (3 + (idx * 2)) + " 0 R").join(" ") + "] /Count " + pageCount + " >>endobj");
-      pages.forEach((pageLines, index) => {
-        const pageObjectId = 3 + (index * 2);
-        const contentObjectId = pageObjectId + 1;
-        const safeLines = pageLines.map((line) => String(line).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)"));
-        const commands = ["BT", "/F1 11 Tf", "48 794 Td"];
-        safeLines.forEach((line, lineIndex) => {
-          if (lineIndex > 0) commands.push("0 -20 Td");
-          commands.push("(" + line + ") Tj");
-        });
-        commands.push("ET");
-        const stream = commands.join("\n");
-        objects.push(pageObjectId + " 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 " + fontObjectId + " 0 R >> >> /Contents " + contentObjectId + " 0 R >>endobj");
-        objects.push(contentObjectId + " 0 obj<< /Length " + stream.length + " >>stream\n" + stream + "\nendstream\nendobj");
-      });
-      objects.push(fontObjectId + " 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj");
-      let pdf = "%PDF-1.4\n";
-      const offsets = [0];
-      objects.forEach((obj) => { offsets.push(pdf.length); pdf += obj + "\n"; });
-      const xrefStart = pdf.length;
-      pdf += "xref\n0 " + (objects.length + 1) + "\n";
-      pdf += "0000000000 65535 f \n";
-      for (let i = 1; i < offsets.length; i += 1) pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
-      pdf += "trailer<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefStart + "\n%%EOF";
-      return new Blob([pdf], { type: "application/pdf" });
-    }
-
-    function downloadBlob(blob, fileName) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = fileName;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
-    }
-
     function exportPdf() {
-      const lines = [
-        "[경영진 보고 문서]",
-        report.cover.title,
-        ...report.cover.meta.map(([k, v]) => k + ": " + v),
-        "",
-        "목차",
-        ...report.toc,
-        ""
-      ];
-      report.sections.forEach((section) => {
-        lines.push(section.title, section.body, "");
-      });
-      const blob = buildPdf(lines);
-      downloadBlob(blob, "security-executive-report.pdf");
+      window.print();
     }
 
     document.getElementById("downloadPdfBtn").addEventListener("click", exportPdf);
