@@ -1,0 +1,1607 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>보안 모니터링 대시보드</title>
+  <style>
+    :root {
+      --bg: #f4efe6;
+      --bg-2: #e7dcc9;
+      --panel: rgba(255, 252, 247, 0.84);
+      --panel-2: #fffdf8;
+      --text: #192128;
+      --muted: #5a6771;
+      --line: rgba(25, 33, 40, 0.1);
+      --accent: #0e6272;
+      --accent-soft: rgba(14, 98, 114, 0.12);
+      --critical: #b42318;
+      --high: #e56a2d;
+      --medium: #d7a313;
+      --low: #2f8f72;
+      --shadow: 0 20px 70px rgba(53, 40, 18, 0.12);
+    }
+
+    body.dark {
+      --bg: #0f151a;
+      --bg-2: #17222a;
+      --panel: rgba(20, 29, 36, 0.88);
+      --panel-2: #162129;
+      --text: #edf3f6;
+      --muted: #9db0bc;
+      --line: rgba(237, 243, 246, 0.12);
+      --accent: #7dd3e0;
+      --accent-soft: rgba(125, 211, 224, 0.1);
+      --critical: #ff7068;
+      --high: #ffab68;
+      --medium: #ffd76e;
+      --low: #66cfaa;
+      --shadow: 0 20px 70px rgba(0, 0, 0, 0.28);
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: "Avenir Next", "Segoe UI", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(229, 106, 45, 0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(14, 98, 114, 0.18), transparent 34%),
+        linear-gradient(180deg, var(--bg) 0%, var(--bg-2) 100%);
+      min-height: 100vh;
+      transition: background .2s ease, color .2s ease;
+    }
+
+    .page {
+      width: min(1340px, calc(100% - 32px));
+      margin: 18px auto 48px;
+    }
+
+    .hero, .panel {
+      background: var(--panel);
+      backdrop-filter: blur(18px);
+      border: 1px solid rgba(255, 255, 255, 0.24);
+      border-radius: 26px;
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 28px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::after {
+      content: "";
+      position: absolute;
+      right: -80px;
+      top: -80px;
+      width: 320px;
+      height: 320px;
+      border-radius: 50%;
+      background: radial-gradient(circle, rgba(14, 98, 114, 0.18), transparent 68%);
+      pointer-events: none;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      padding: 7px 12px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3, p { margin: 0; }
+
+    h1 {
+      margin-top: 14px;
+      max-width: 840px;
+      font-size: clamp(34px, 5vw, 60px);
+      line-height: .95;
+      letter-spacing: -.05em;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.45fr 1fr;
+      gap: 18px;
+      margin-top: 22px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-copy p {
+      margin-top: 16px;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.6;
+      font-size: 16px;
+    }
+
+    .toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .btn, select {
+      font: inherit;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: var(--panel-2);
+      color: var(--text);
+      padding: 10px 14px;
+      cursor: pointer;
+    }
+
+    .btn.primary {
+      background: var(--accent);
+      border-color: transparent;
+      color: white;
+    }
+
+    .hero-side {
+      display: grid;
+      gap: 12px;
+      align-content: start;
+    }
+
+    .statbox {
+      padding: 18px;
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: rgba(255,255,255,.42);
+    }
+
+    body.dark .statbox {
+      background: rgba(255,255,255,.04);
+    }
+
+    .label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      font-weight: 800;
+    }
+
+    .value {
+      margin-top: 8px;
+      font-size: 30px;
+      font-weight: 800;
+      letter-spacing: -.05em;
+    }
+
+    .sub {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(12, 1fr);
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .panel {
+      padding: 22px;
+    }
+
+    .span-12 { grid-column: span 12; }
+    .span-8 { grid-column: span 8; }
+    .span-7 { grid-column: span 7; }
+    .span-6 { grid-column: span 6; }
+    .span-5 { grid-column: span 5; }
+    .span-4 { grid-column: span 4; }
+
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: end;
+      margin-bottom: 18px;
+    }
+
+    .section-head p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      max-width: 660px;
+    }
+
+    .upload-shell {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 16px;
+    }
+
+    .dropzone {
+      border: 1.5px dashed var(--accent);
+      border-radius: 22px;
+      padding: 22px;
+      background: linear-gradient(180deg, var(--accent-soft), transparent);
+      transition: transform .18s ease, border-color .18s ease;
+    }
+
+    .dropzone.dragover {
+      transform: translateY(-1px);
+      border-color: var(--high);
+    }
+
+    .dropzone strong {
+      display: block;
+      font-size: 22px;
+      letter-spacing: -.03em;
+    }
+
+    .dropzone p {
+      margin-top: 8px;
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .dropzone input[type="file"] {
+      margin-top: 16px;
+      width: 100%;
+      color: var(--muted);
+    }
+
+    .hint-list, .metric-grid, .incident-list, .simple-list, .evidence-list, .detail-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .hint, .simple-item, .evidence-item, .detail-item, .message, .metric, .incident {
+      border-radius: 18px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+    }
+
+    .hint, .simple-item, .evidence-item, .detail-item, .message {
+      padding: 14px 16px;
+    }
+
+    .hint strong, .simple-item strong, .evidence-item strong, .detail-item strong {
+      display: block;
+      font-size: 16px;
+    }
+
+    .hint small, .simple-item small, .evidence-item small, .detail-item small, .message small {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .message.error {
+      background: rgba(180, 35, 24, .08);
+      border-color: rgba(180, 35, 24, .35);
+    }
+
+    .filters {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .metric-grid {
+      grid-template-columns: repeat(4, 1fr);
+    }
+
+    .metric {
+      padding: 18px;
+    }
+
+    .metric .number {
+      margin-top: 6px;
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -.05em;
+    }
+
+    .metric .note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .incident {
+      padding: 16px;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease;
+    }
+
+    .incident:hover {
+      transform: translateY(-1px);
+    }
+
+    .incident.active {
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+
+    .incident-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .incident-head h3 {
+      font-size: 22px;
+      letter-spacing: -.03em;
+    }
+
+    .incident-meta {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: white;
+      white-space: nowrap;
+    }
+
+    .critical { background: var(--critical); }
+    .high { background: var(--high); }
+    .medium { background: var(--medium); color: #2a1f00; }
+    .low { background: var(--low); }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .chip {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 13px;
+      background: rgba(0,0,0,.03);
+    }
+
+    body.dark .chip {
+      background: rgba(255,255,255,.04);
+    }
+
+    .chart-card {
+      border-radius: 20px;
+      border: 1px solid var(--line);
+      background: var(--panel-2);
+      padding: 18px;
+    }
+
+    .chart-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+
+    .donut-wrap {
+      display: grid;
+      place-items: center;
+      min-height: 240px;
+    }
+
+    .donut-caption {
+      text-align: center;
+      margin-top: -140px;
+      position: relative;
+      z-index: 2;
+      pointer-events: none;
+    }
+
+    .donut-caption strong {
+      display: block;
+      font-size: 28px;
+      letter-spacing: -.04em;
+    }
+
+    .legend {
+      display: grid;
+      gap: 10px;
+    }
+
+    .legend-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      gap: 10px;
+      align-items: center;
+      font-size: 14px;
+    }
+
+    .dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    .bar-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 190px 1fr 72px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .bar {
+      height: 14px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.08);
+      overflow: hidden;
+    }
+
+    body.dark .bar {
+      background: rgba(255,255,255,.08);
+    }
+
+    .bar span {
+      display: block;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), #72c8d7);
+    }
+
+    .time-chart {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+      gap: 8px;
+      min-height: 230px;
+      align-items: end;
+    }
+
+    .time-bar {
+      display: grid;
+      grid-template-rows: 1fr auto auto;
+      gap: 8px;
+      text-align: center;
+      cursor: pointer;
+    }
+
+    .time-bar .stack {
+      height: 170px;
+      display: flex;
+      align-items: end;
+      justify-content: center;
+    }
+
+    .time-bar .column {
+      width: 100%;
+      max-width: 40px;
+      border-radius: 14px 14px 8px 8px;
+      background: linear-gradient(180deg, var(--accent), #7fd4e1);
+    }
+
+    .time-bar.active .column {
+      background: linear-gradient(180deg, var(--high), #ffc18e);
+    }
+
+    .time-bar .count {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .time-bar .label {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .empty {
+      border-radius: 18px;
+      border: 1px dashed var(--line);
+      background: var(--panel-2);
+      color: var(--muted);
+      padding: 22px;
+      line-height: 1.6;
+    }
+
+    .foot {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 980px) {
+      .hero-grid,
+      .upload-shell,
+      .metric-grid,
+      .chart-split {
+        grid-template-columns: 1fr;
+      }
+
+      .span-8,
+      .span-7,
+      .span-6,
+      .span-5,
+      .span-4 {
+        grid-column: span 12;
+      }
+
+      .bar-row {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+      }
+
+      .toolbar,
+      .upload-shell,
+      #errorBox {
+        display: none !important;
+      }
+
+      .hero, .panel {
+        box-shadow: none;
+        border: 1px solid #ddd;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <section class="hero">
+      <span class="eyebrow">Executive Monitoring View</span>
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <h1>CSV를 올리면 위험한 흐름부터 바로 보이는 보안 대시보드</h1>
+          <p>공격 유형 자동 분류, 위험도 우선 정렬, 시간대 차트, 상위 공격자 IP, 필터, CSV/PDF 내보내기를 한 화면에 묶었습니다. 경영진이 보기 쉽게 기술 용어는 줄이고 “무슨 일이 있었는지” 중심으로 보여줍니다.</p>
+          <div class="toolbar">
+            <button class="btn primary" id="loadSampleBtn">현재 `access-logs.csv` 불러오기</button>
+            <button class="btn" id="exportCsvBtn">필터 결과 CSV</button>
+            <button class="btn" id="exportPdfBtn">PDF 다운로드</button>
+            <button class="btn" id="themeBtn">다크 모드</button>
+          </div>
+        </div>
+        <div class="hero-side">
+          <div class="statbox">
+            <div class="label">한 번에 보는 흐름</div>
+            <div class="value">업로드 → 분류 → 보고</div>
+            <div class="sub">CSV 업로드 후 자동으로 핵심 지표, 차트, 상세 근거, 대응 권고가 갱신됩니다.</div>
+          </div>
+          <div class="statbox">
+            <div class="label">업무 방식</div>
+            <div class="value">기술보다 사용성</div>
+            <div class="sub">색상은 위험도 중심, 설명은 친절하게, 정리 방식은 경영진 보고 기준으로 맞췄습니다.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="panel span-12">
+        <div class="section-head">
+          <div>
+            <h2>파일 업로드</h2>
+            <p>드래그앤드롭과 파일 선택을 모두 지원합니다. 영문 컬럼명, 일부 누락 컬럼, 빈 행, 중복 행도 최대한 정리해서 읽습니다.</p>
+          </div>
+        </div>
+        <div class="upload-shell">
+          <div class="dropzone" id="dropzone">
+            <strong>CSV 파일을 드롭하거나 선택하세요</strong>
+            <p>`timestamp/time`, `source_ip/src_ip`, `path/url/url_path`, `status/status_code/response_code`가 있으면 가장 안정적으로 동작합니다.</p>
+            <input type="file" id="fileInput" accept=".csv,text/csv">
+            <div class="message" id="statusBox">
+              <strong>대기 중</strong>
+              <small>파일을 선택하거나 샘플 불러오기를 눌러 시작하세요.</small>
+            </div>
+            <div class="message error" id="errorBox" hidden>
+              <strong>파일을 읽지 못했습니다</strong>
+              <small id="errorText">CSV 형식을 확인해 주세요.</small>
+            </div>
+          </div>
+          <div class="hint-list">
+            <div class="hint">
+              <strong>위험도별 색상</strong>
+              <small>빨간색은 즉시 대응이 필요한 항목, 주황색은 빠른 조치가 필요한 항목입니다.</small>
+            </div>
+            <div class="hint">
+              <strong>필터와 상세 보기</strong>
+              <small>유형, 위험도, 시간대로 좁혀 보고, 사건 카드를 누르면 자세한 근거를 따로 보여줍니다.</small>
+            </div>
+            <div class="hint">
+              <strong>보고서 출력</strong>
+              <small>필터 결과를 CSV로 다운로드하고, 요약 PDF도 바로 생성할 수 있습니다.</small>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel span-12">
+        <div class="section-head">
+          <div>
+            <h2>보기 필터</h2>
+            <p>보고 대상에 맞게 유형, 위험도, 시간대를 바로 좁혀볼 수 있습니다.</p>
+          </div>
+          <div class="filters">
+            <select id="typeFilter"><option value="all">모든 유형</option></select>
+            <select id="severityFilter">
+              <option value="all">모든 위험도</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <select id="timeStartFilter"><option value="all">시작 시간 전체</option></select>
+            <select id="timeEndFilter"><option value="all">종료 시간 전체</option></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel span-12">
+        <div class="section-head">
+          <div>
+            <h2>요약 지표</h2>
+            <p>지금 업로드한 파일에서 가장 먼저 봐야 할 숫자만 추렸습니다.</p>
+          </div>
+        </div>
+        <div class="metric-grid" id="metrics"></div>
+      </div>
+
+      <div class="panel span-8">
+        <div class="section-head">
+          <div>
+            <h2>위험한 이벤트</h2>
+            <p>자동 분류된 사건을 위험도 순으로 보여줍니다. 카드를 누르면 오른쪽 상세 보기가 바뀝니다.</p>
+          </div>
+        </div>
+        <div class="incident-list" id="incidentList"></div>
+      </div>
+
+      <div class="panel span-4">
+        <div class="section-head">
+          <div>
+            <h2>상세 보기</h2>
+            <p>선택한 사건의 범위, 주요 근거, 대표 경로를 요약합니다.</p>
+          </div>
+        </div>
+        <div class="detail-list" id="detailView"></div>
+      </div>
+
+      <div class="panel span-6">
+        <div class="section-head">
+          <div>
+            <h2>위협 유형 분류</h2>
+            <p>유형별 비중과 심각도 색상을 함께 보여줍니다.</p>
+          </div>
+        </div>
+        <div class="chart-split chart">
+          <div class="chart-card">
+            <div class="donut-wrap" id="donutChart"></div>
+          </div>
+          <div class="chart-card">
+            <div class="legend" id="donutLegend"></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel span-6">
+        <div class="section-head">
+          <div>
+            <h2>공격자 IP 분석</h2>
+            <p>많이 나타난 IP와 출처 분포를 함께 보여줍니다.</p>
+          </div>
+        </div>
+        <div class="bar-list" id="ipBars"></div>
+        <div class="foot">아래 분포는 IP 대역 기준의 간단한 출처 추정입니다.</div>
+        <div class="bar-list" id="regionBars" style="margin-top:12px;"></div>
+      </div>
+
+      <div class="panel span-8">
+        <div class="section-head">
+          <div>
+            <h2>시간대별 위험 흐름</h2>
+            <p>시간대 막대를 클릭하면 해당 구간만 바로 필터링됩니다.</p>
+          </div>
+        </div>
+        <div class="time-chart chart" id="timeChart"></div>
+      </div>
+
+      <div class="panel span-4">
+        <div class="section-head">
+          <div>
+            <h2>정상/노이즈 분리</h2>
+            <p>헬스체크나 정적 자원 요청을 따로 떼어내야 사건이 더 선명하게 보입니다.</p>
+          </div>
+        </div>
+        <div class="simple-list" id="noiseList"></div>
+      </div>
+
+      <div class="panel span-6">
+        <div class="section-head">
+          <div>
+            <h2>대표 근거</h2>
+            <p>원본 로그를 열지 않고도 바로 설명할 수 있는 행만 뽑습니다.</p>
+          </div>
+        </div>
+        <div class="evidence-list" id="evidenceList"></div>
+      </div>
+
+      <div class="panel span-6">
+        <div class="section-head">
+          <div>
+            <h2>즉시 대응 권고</h2>
+            <p>현재 결과를 기준으로 먼저 실행할 조치만 남겼습니다.</p>
+          </div>
+        </div>
+        <div class="simple-list" id="actionsList"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const severityWeight = { critical: 4, high: 3, medium: 2, low: 1 };
+    const severityLabel = { critical: "Critical", high: "High", medium: "Medium", low: "Low" };
+    const typeLabel = {
+      sqli: "SQL Injection",
+      credential: "Credential Stuffing",
+      traversal: "Directory Traversal",
+      insider: "민감정보 대량 추출"
+    };
+    const typeColor = {
+      sqli: "var(--critical)",
+      credential: "var(--high)",
+      traversal: "var(--medium)",
+      insider: "var(--low)"
+    };
+
+    const state = {
+      rows: [],
+      suspicious: [],
+      filteredSuspicious: [],
+      incidents: [],
+      filteredIncidents: [],
+      selectedIncidentKey: "",
+      fileName: "",
+      filters: {
+        type: "all",
+        severity: "all",
+        start: "all",
+        end: "all"
+      }
+    };
+
+    const aliases = {
+      timestamp: ["timestamp", "time", "event_time", "datetime", "date_time", "occurred_at"],
+      source_ip: ["source_ip", "src_ip", "client_ip", "ip", "sourceip", "remote_addr"],
+      dest_ip: ["dest_ip", "destination_ip", "server_ip", "dst_ip"],
+      dest_port: ["dest_port", "destination_port", "dst_port", "port"],
+      protocol: ["protocol", "proto", "scheme"],
+      method: ["method", "http_method", "verb"],
+      path: ["path", "url", "url_path", "uri", "request", "request_path", "endpoint"],
+      status_code: ["status_code", "status", "http_status", "response_code"],
+      user_agent: ["user_agent", "ua", "agent", "browser"],
+      bytes: ["bytes", "bytes_sent", "response_bytes", "size"],
+      user_id: ["user_id", "user", "account", "employee_id", "userid"]
+    };
+
+    const elements = {
+      body: document.body,
+      dropzone: document.getElementById("dropzone"),
+      fileInput: document.getElementById("fileInput"),
+      loadSampleBtn: document.getElementById("loadSampleBtn"),
+      exportCsvBtn: document.getElementById("exportCsvBtn"),
+      exportPdfBtn: document.getElementById("exportPdfBtn"),
+      themeBtn: document.getElementById("themeBtn"),
+      statusBox: document.getElementById("statusBox"),
+      errorBox: document.getElementById("errorBox"),
+      errorText: document.getElementById("errorText"),
+      typeFilter: document.getElementById("typeFilter"),
+      severityFilter: document.getElementById("severityFilter"),
+      timeStartFilter: document.getElementById("timeStartFilter"),
+      timeEndFilter: document.getElementById("timeEndFilter"),
+      metrics: document.getElementById("metrics"),
+      incidentList: document.getElementById("incidentList"),
+      detailView: document.getElementById("detailView"),
+      donutChart: document.getElementById("donutChart"),
+      donutLegend: document.getElementById("donutLegend"),
+      ipBars: document.getElementById("ipBars"),
+      regionBars: document.getElementById("regionBars"),
+      timeChart: document.getElementById("timeChart"),
+      noiseList: document.getElementById("noiseList"),
+      evidenceList: document.getElementById("evidenceList"),
+      actionsList: document.getElementById("actionsList")
+    };
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#39;");
+    }
+
+    function formatNumber(value) {
+      return new Intl.NumberFormat("ko-KR").format(Number(value || 0));
+    }
+
+    function formatBytes(value) {
+      const n = Number(value || 0);
+      if (!Number.isFinite(n) || n <= 0) return "0B";
+      if (n >= 1024 * 1024) return (n / (1024 * 1024)).toFixed(1) + "MB";
+      if (n >= 1024) return Math.round(n / 1024) + "KB";
+      return n + "B";
+    }
+
+    function normalizeKey(key) {
+      return String(key || "").trim().toLowerCase().replace(/[\s-]+/g, "_");
+    }
+
+    function minuteKey(timestamp) {
+      return String(timestamp || "").slice(0, 16);
+    }
+
+    function shortTime(value) {
+      const match = String(value || "").match(/T(\d{2}:\d{2})/);
+      return match ? match[1] : String(value || "-");
+    }
+
+    function setStatus(title, detail) {
+      elements.statusBox.innerHTML = "<strong>" + escapeHtml(title) + "</strong><small>" + escapeHtml(detail) + "</small>";
+    }
+
+    function setError(text) {
+      elements.errorText.textContent = text;
+      elements.errorBox.hidden = false;
+    }
+
+    function clearError() {
+      elements.errorBox.hidden = true;
+    }
+
+    function parseCsv(text) {
+      const rows = [];
+      let row = [];
+      let cell = "";
+      let inQuotes = false;
+
+      for (let i = 0; i < text.length; i += 1) {
+        const char = text[i];
+        const next = text[i + 1];
+
+        if (char === '"') {
+          if (inQuotes && next === '"') {
+            cell += '"';
+            i += 1;
+          } else {
+            inQuotes = !inQuotes;
+          }
+          continue;
+        }
+
+        if (char === "," && !inQuotes) {
+          row.push(cell);
+          cell = "";
+          continue;
+        }
+
+        if ((char === "\n" || char === "\r") && !inQuotes) {
+          if (char === "\r" && next === "\n") i += 1;
+          row.push(cell);
+          if (row.some((item) => item.trim() !== "")) rows.push(row);
+          row = [];
+          cell = "";
+          continue;
+        }
+
+        cell += char;
+      }
+
+      if (cell.length || row.length) {
+        row.push(cell);
+        if (row.some((item) => item.trim() !== "")) rows.push(row);
+      }
+
+      return rows;
+    }
+
+    function mapHeaders(headerRow) {
+      const normalized = headerRow.map(normalizeKey);
+      const mapped = {};
+      Object.entries(aliases).forEach(([target, names]) => {
+        const index = normalized.findIndex((item) => names.includes(item));
+        if (index >= 0) mapped[target] = index;
+      });
+      return mapped;
+    }
+
+    function isValidTimestamp(value) {
+      return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(String(value || ""));
+    }
+
+    function toObjects(matrix) {
+      if (!matrix.length) throw new Error("CSV에 데이터가 없습니다.");
+      const headerMap = mapHeaders(matrix[0]);
+      if (headerMap.timestamp === undefined || headerMap.source_ip === undefined || headerMap.path === undefined || headerMap.status_code === undefined) {
+        throw new Error("필수 컬럼이 부족합니다. timestamp/time, source_ip/src_ip, path/url/url_path, status/status_code/response_code가 필요합니다.");
+      }
+
+      const dedupe = new Set();
+      const rows = [];
+      for (let i = 1; i < matrix.length; i += 1) {
+        const source = matrix[i];
+        const record = {};
+        Object.keys(aliases).forEach((field) => {
+          record[field] = headerMap[field] !== undefined ? String(source[headerMap[field]] || "").trim() : "";
+        });
+        if (!record.timestamp && !record.path && !record.source_ip) continue;
+        if (!record.path || !record.source_ip) continue;
+        record.status_code = String(record.status_code || "").replace(/[^\d]/g, "");
+        record.bytes = Number(record.bytes) || 0;
+        record.timestamp_valid = isValidTimestamp(record.timestamp);
+        const fingerprint = [
+          record.timestamp,
+          record.source_ip,
+          record.dest_ip,
+          record.path,
+          record.status_code,
+          record.user_id
+        ].join("|");
+        if (dedupe.has(fingerprint)) continue;
+        dedupe.add(fingerprint);
+        rows.push(record);
+      }
+      if (!rows.length) throw new Error("데이터 행을 읽지 못했습니다. 파일 구조를 확인해 주세요.");
+      return rows;
+    }
+
+    function isPrivateIp(ip) {
+      return /^10\./.test(ip) || /^172\.(1[6-9]|2\d|3[0-1])\./.test(ip) || /^192\.168\./.test(ip);
+    }
+
+    function classifyRows(rows) {
+      const suspicious = [];
+      const sqliPattern = /('|%27).*(or|union|select|drop|sleep|extractvalue|information_schema|@@version)|union\s+select|drop\s+table|sleep\(|extractvalue/i;
+      const traversalPattern = /(\.\.\/|%2e%2e|%2f|etc\/passwd|etc\/shadow|id_rsa|proc\/self|var\/log\/auth\.log)/i;
+      const exportPattern = /\/api\/admin\/export|\/api\/hr\/employees\/all/i;
+
+      rows.forEach((row, index) => {
+        const path = row.path || "";
+        const ip = row.source_ip || "";
+        const ua = row.user_agent || "";
+        const status = row.status_code;
+        const base = {
+          id: index + 1,
+          timestamp: row.timestamp,
+          timeBucket: row.timestamp_valid ? minuteKey(row.timestamp) : "invalid",
+          source_ip: ip,
+          path,
+          status_code: status,
+          user_id: row.user_id || "-",
+          bytes: row.bytes || 0
+        };
+
+        if (sqliPattern.test(path) || /sqlmap/i.test(ua)) {
+          suspicious.push({ ...base, type: "sqli", severity: status === "200" ? "critical" : "high" });
+          return;
+        }
+
+        if (traversalPattern.test(path) && /download|file/i.test(path)) {
+          suspicious.push({ ...base, type: "traversal", severity: status === "200" ? "high" : "medium" });
+          return;
+        }
+
+        if (/\/api\/auth\/login/i.test(path) && !isPrivateIp(ip)) {
+          suspicious.push({ ...base, type: "credential", severity: status === "200" ? "high" : "medium" });
+          return;
+        }
+
+        if (exportPattern.test(path) || (/include=ssn|format=csv|format=xlsx|dept=executive/i.test(path) && row.user_id)) {
+          suspicious.push({ ...base, type: "insider", severity: row.bytes > 500000 ? "high" : "medium" });
+        }
+      });
+
+      return suspicious;
+    }
+
+    function describeIncident(incident) {
+      if (incident.type === "sqli") {
+        return "외부에서 로그인/사용자 조회 API를 노린 SQL Injection 패턴이 반복적으로 관찰됐습니다. 200 응답이 있으면 실제 우회 가능성을 의심해야 합니다.";
+      }
+      if (incident.type === "credential") {
+        return "외부 로그인 시도가 여러 IP에 분산돼 반복됐습니다. 실패가 많아도 성공 응답이 있으면 계정 탈취 가능성이 있습니다.";
+      }
+      if (incident.type === "traversal") {
+        return "파일 다운로드 경로를 악용해 시스템 파일에 접근하려는 시도입니다. 차단되더라도 표적화 자체가 위험 신호입니다.";
+      }
+      return "민감정보 export가 짧은 시간 안에 반복되었습니다. 정상 권한이 있어도 시간대, 범위, 용량이 비정상적이면 조사 대상입니다.";
+    }
+
+    function summarizeIncidents(suspicious) {
+      const grouped = new Map();
+      suspicious.forEach((item) => {
+        const key = item.type === "credential"
+          ? "credential:external"
+          : item.type === "insider"
+            ? "insider:" + (item.user_id || item.source_ip)
+            : item.type + ":" + item.source_ip;
+
+        if (!grouped.has(key)) {
+          grouped.set(key, {
+            key,
+            type: item.type,
+            title: typeLabel[item.type],
+            severity: item.severity,
+            count: 0,
+            bytes: 0,
+            start: item.timestamp,
+            end: item.timestamp,
+            ips: new Set(),
+            users: new Set(),
+            paths: new Set(),
+            evidence: [],
+            statusCounts: {}
+          });
+        }
+
+        const group = grouped.get(key);
+        group.count += 1;
+        group.bytes += Number(item.bytes || 0);
+        group.ips.add(item.source_ip);
+        if (item.user_id && item.user_id !== "-") group.users.add(item.user_id);
+        group.paths.add(item.path);
+        group.statusCounts[item.status_code] = (group.statusCounts[item.status_code] || 0) + 1;
+        if (severityWeight[item.severity] > severityWeight[group.severity]) group.severity = item.severity;
+        if (item.timestamp < group.start) group.start = item.timestamp;
+        if (item.timestamp > group.end) group.end = item.timestamp;
+        if (group.evidence.length < 5) group.evidence.push(item);
+      });
+
+      return Array.from(grouped.values())
+        .map((group) => ({
+          ...group,
+          ips: Array.from(group.ips),
+          users: Array.from(group.users),
+          paths: Array.from(group.paths),
+          summary: describeIncident(group)
+        }))
+        .sort((a, b) => {
+          const sev = severityWeight[b.severity] - severityWeight[a.severity];
+          if (sev) return sev;
+          return b.count - a.count;
+        });
+    }
+
+    function buildMetrics(rows, suspicious, incidents) {
+      const highRisk = incidents.filter((item) => severityWeight[item.severity] >= severityWeight.high).length;
+      const impacted = new Set();
+      suspicious.forEach((item) => {
+        if (item.type === "credential" && item.status_code === "200") impacted.add(item.source_ip + ":login-success");
+        if (item.user_id && item.user_id !== "-") impacted.add(item.user_id);
+      });
+      const exportBytes = incidents.filter((item) => item.type === "insider").reduce((sum, item) => sum + item.bytes, 0);
+      return [
+        { label: "전체 로그", number: formatNumber(rows.length), note: "빈 행과 중복 행을 정리한 뒤의 유효 로그 수입니다." },
+        { label: "의심 이벤트", number: formatNumber(suspicious.length), note: "자동 규칙으로 추린 조사 대상 로그 수입니다." },
+        { label: "고위험 사건", number: formatNumber(highRisk), note: "Critical 또는 High로 본 사건 수입니다." },
+        { label: "노출 가능 계정/주체", number: formatNumber(impacted.size), note: "로그인 성공 또는 민감 데이터 export와 연관된 주체 수입니다." },
+        { label: "민감 데이터 반출", number: formatBytes(exportBytes), note: "export 계열 요청에서 계산한 총 전송량입니다." },
+        { label: "사건 그룹", number: formatNumber(incidents.length), note: "개별 로그를 묶어 경영진이 보기 쉬운 단위로 정리한 수입니다." }
+      ];
+    }
+
+    function getTypeCounts(incidents) {
+      const counts = {};
+      incidents.forEach((item) => {
+        counts[item.type] = (counts[item.type] || 0) + item.count;
+      });
+      return Object.entries(counts).map(([type, count]) => ({ type, count }));
+    }
+
+    function getTopIps(suspicious) {
+      const counts = {};
+      suspicious.forEach((item) => {
+        counts[item.source_ip] = (counts[item.source_ip] || 0) + 1;
+      });
+      return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 10);
+    }
+
+    function getRegion(ip) {
+      if (/^10\./.test(ip)) return "VPN / Internal";
+      if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(ip)) return "Dev Network";
+      if (/^192\.168\./.test(ip)) return "Office";
+      if (/^198\./.test(ip) || /^54\./.test(ip)) return "North America";
+      if (/^203\./.test(ip) || /^183\./.test(ip)) return "Asia Pacific";
+      if (/^141\./.test(ip) || /^213\./.test(ip) || /^83\./.test(ip) || /^78\./.test(ip)) return "Europe";
+      return "Unknown Internet";
+    }
+
+    function getRegionCounts(suspicious) {
+      const counts = {};
+      suspicious.forEach((item) => {
+        const region = getRegion(item.source_ip);
+        counts[region] = (counts[region] || 0) + 1;
+      });
+      return Object.entries(counts).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    }
+
+    function getNoiseGroups(rows) {
+      const health = rows.filter((row) => row.path === "/health" || row.path === "/ping").length;
+      const staticAssets = rows.filter((row) => /^\/static\//.test(row.path) || ["/robots.txt", "/sitemap.xml", "/favicon.ico"].includes(row.path)).length;
+      const internalDev = rows.filter((row) => /^172\.(1[6-9]|2\d|3[0-1])\./.test(row.source_ip)).length;
+      return [
+        { title: "헬스체크", count: health, note: "`/health`, `/ping` 자동 호출" },
+        { title: "정적 리소스 / 봇", count: staticAssets, note: "favicon, robots, sitemap, static 파일 접근" },
+        { title: "개발팀 추정", count: internalDev, note: "172.16.x.x 내부 대역 접근" }
+      ];
+    }
+
+    function getTimeBuckets(suspicious) {
+      const counts = {};
+      suspicious.forEach((item) => {
+        if (item.timeBucket === "invalid") return;
+        counts[item.timeBucket] = (counts[item.timeBucket] || 0) + 1;
+      });
+      return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0])).slice(0, 24);
+    }
+
+    function updateTimeFilterOptions() {
+      const buckets = getTimeBuckets(state.suspicious);
+      const options = '<option value="all">전체 시간</option>' + buckets.map(([bucket]) => '<option value="' + escapeHtml(bucket) + '">' + escapeHtml(bucket.slice(11, 16)) + "</option>").join("");
+      elements.timeStartFilter.innerHTML = options;
+      elements.timeEndFilter.innerHTML = options;
+      elements.timeStartFilter.value = state.filters.start;
+      elements.timeEndFilter.value = state.filters.end;
+    }
+
+    function applyFilters() {
+      state.filteredSuspicious = state.suspicious.filter((item) => {
+        if (state.filters.type !== "all" && item.type !== state.filters.type) return false;
+        if (state.filters.severity !== "all" && item.severity !== state.filters.severity) return false;
+        if (state.filters.start !== "all" && item.timeBucket !== "invalid" && item.timeBucket < state.filters.start) return false;
+        if (state.filters.end !== "all" && item.timeBucket !== "invalid" && item.timeBucket > state.filters.end) return false;
+        return true;
+      });
+      state.filteredIncidents = summarizeIncidents(state.filteredSuspicious);
+      if (!state.filteredIncidents.find((item) => item.key === state.selectedIncidentKey)) {
+        state.selectedIncidentKey = state.filteredIncidents[0] ? state.filteredIncidents[0].key : "";
+      }
+    }
+
+    function renderMetrics() {
+      const metrics = buildMetrics(state.rows, state.filteredSuspicious, state.filteredIncidents);
+      elements.metrics.innerHTML = metrics.map((item) => (
+        '<div class="metric"><div class="label">' + escapeHtml(item.label) + '</div><div class="number">' + escapeHtml(item.number) + '</div><div class="note">' + escapeHtml(item.note) + "</div></div>"
+      )).join("");
+    }
+
+    function renderIncidents() {
+      if (!state.filteredIncidents.length) {
+        elements.incidentList.innerHTML = '<div class="empty">현재 필터 기준으로 표시할 사건이 없습니다.</div>';
+        return;
+      }
+
+      elements.incidentList.innerHTML = state.filteredIncidents.map((item) => {
+        const chips = [
+          "기간 " + shortTime(item.start) + " ~ " + shortTime(item.end),
+          "로그 " + formatNumber(item.count) + "건"
+        ];
+        if (item.ips.length) chips.push("IP " + item.ips.join(", "));
+        if (item.users.length) chips.push("계정 " + item.users.join(", "));
+        if (item.bytes) chips.push("용량 " + formatBytes(item.bytes));
+        return (
+          '<div class="incident' + (item.key === state.selectedIncidentKey ? " active" : "") + '" data-key="' + escapeHtml(item.key) + '">' +
+            '<div class="incident-head"><h3>' + escapeHtml(item.title) + '</h3><span class="badge ' + item.severity + '">' + severityLabel[item.severity] + "</span></div>" +
+            '<div class="incident-meta">' + escapeHtml(item.summary) + "</div>" +
+            '<div class="chips">' + chips.map((chip) => '<span class="chip">' + escapeHtml(chip) + "</span>").join("") + "</div>" +
+          "</div>"
+        );
+      }).join("");
+
+      elements.incidentList.querySelectorAll(".incident").forEach((card) => {
+        card.addEventListener("click", () => {
+          state.selectedIncidentKey = card.dataset.key;
+          renderIncidents();
+          renderDetail();
+        });
+      });
+    }
+
+    function renderDetail() {
+      const incident = state.filteredIncidents.find((item) => item.key === state.selectedIncidentKey);
+      if (!incident) {
+        elements.detailView.innerHTML = '<div class="empty">사건을 선택하면 자세한 정보를 여기에 보여줍니다.</div>';
+        return;
+      }
+
+      const rows = [
+        ["유형", incident.title],
+        ["위험도", severityLabel[incident.severity]],
+        ["시간", shortTime(incident.start) + " ~ " + shortTime(incident.end)],
+        ["주요 IP", incident.ips.join(", ") || "-"],
+        ["계정", incident.users.join(", ") || "-"],
+        ["대표 경로", incident.paths.slice(0, 3).join(" / ") || "-"]
+      ];
+      elements.detailView.innerHTML = rows.map(([title, detail]) => (
+        '<div class="detail-item"><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(detail) + "</small></div>"
+      )).join("");
+    }
+
+    function polarToCartesian(cx, cy, r, angleDeg) {
+      const angleRad = (angleDeg - 90) * Math.PI / 180.0;
+      return { x: cx + (r * Math.cos(angleRad)), y: cy + (r * Math.sin(angleRad)) };
+    }
+
+    function describeArc(cx, cy, r, startAngle, endAngle) {
+      const start = polarToCartesian(cx, cy, r, endAngle);
+      const end = polarToCartesian(cx, cy, r, startAngle);
+      const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+      return ["M", start.x, start.y, "A", r, r, 0, largeArcFlag, 0, end.x, end.y].join(" ");
+    }
+
+    function renderDonut() {
+      const data = getTypeCounts(state.filteredIncidents);
+      if (!data.length) {
+        elements.donutChart.innerHTML = '<div class="empty">유형 차트를 그릴 사건이 없습니다.</div>';
+        elements.donutLegend.innerHTML = "";
+        return;
+      }
+
+      const total = data.reduce((sum, item) => sum + item.count, 0);
+      let currentAngle = 0;
+      const paths = [];
+
+      data.forEach((item) => {
+        const angle = total ? (item.count / total) * 360 : 0;
+        const d = describeArc(110, 110, 78, currentAngle, currentAngle + angle);
+        paths.push('<path d="' + d + '" stroke="' + typeColor[item.type] + '" stroke-width="24" fill="none" stroke-linecap="round"></path>');
+        currentAngle += angle;
+      });
+
+      elements.donutChart.innerHTML =
+        '<div style="position:relative;width:220px;height:220px;">' +
+          '<svg width="220" height="220" viewBox="0 0 220 220" role="img" aria-label="Threat type donut chart">' +
+            '<circle cx="110" cy="110" r="78" stroke="rgba(0,0,0,0.08)" stroke-width="24" fill="none"></circle>' +
+            paths.join("") +
+          "</svg>" +
+          '<div class="donut-caption"><strong>' + escapeHtml(formatNumber(total)) + '</strong><span style="color:var(--muted);font-size:13px;">총 의심 로그</span></div>' +
+        "</div>";
+
+      elements.donutLegend.innerHTML = data.map((item) => (
+        '<div class="legend-row"><span class="dot" style="background:' + typeColor[item.type] + '"></span><span>' + escapeHtml(typeLabel[item.type]) + '</span><strong>' + escapeHtml(formatNumber(item.count)) + "</strong></div>"
+      )).join("");
+    }
+
+    function renderIpBars() {
+      const top = getTopIps(state.filteredSuspicious);
+      if (!top.length) {
+        elements.ipBars.innerHTML = '<div class="empty">상위 공격자 IP가 없습니다.</div>';
+        elements.regionBars.innerHTML = "";
+        return;
+      }
+      const max = top[0][1];
+      elements.ipBars.innerHTML = top.map(([ip, count]) => (
+        '<div class="bar-row"><strong>' + escapeHtml(ip) + '</strong><div class="bar"><span style="width:' + ((count / max) * 100).toFixed(1) + '%"></span></div><span>' + escapeHtml(formatNumber(count)) + "</span></div>"
+      )).join("");
+
+      const regions = getRegionCounts(state.filteredSuspicious);
+      const regionMax = regions[0] ? regions[0][1] : 1;
+      elements.regionBars.innerHTML = regions.map(([region, count]) => (
+        '<div class="bar-row"><strong>' + escapeHtml(region) + '</strong><div class="bar"><span style="width:' + ((count / regionMax) * 100).toFixed(1) + '%"></span></div><span>' + escapeHtml(formatNumber(count)) + "</span></div>"
+      )).join("");
+    }
+
+    function renderTimeChart() {
+      const buckets = getTimeBuckets(state.filteredSuspicious);
+      if (!buckets.length) {
+        elements.timeChart.innerHTML = '<div class="empty">시간대 차트를 그릴 수 있는 데이터가 없습니다.</div>';
+        return;
+      }
+      const max = Math.max(...buckets.map((item) => item[1]));
+      elements.timeChart.innerHTML = buckets.map(([bucket, count]) => {
+        const height = Math.max(12, Math.round((count / max) * 170));
+        const active = state.filters.start === bucket && state.filters.end === bucket;
+        return (
+          '<div class="time-bar' + (active ? " active" : "") + '" data-bucket="' + escapeHtml(bucket) + '">' +
+            '<div class="stack"><div class="column" style="height:' + height + 'px"></div></div>' +
+            '<div class="count">' + escapeHtml(String(count)) + "</div>" +
+            '<div class="label">' + escapeHtml(bucket.slice(11, 16)) + "</div>" +
+          "</div>"
+        );
+      }).join("");
+
+      elements.timeChart.querySelectorAll(".time-bar").forEach((bar) => {
+        bar.addEventListener("click", () => {
+          const bucket = bar.dataset.bucket;
+          state.filters.start = bucket;
+          state.filters.end = bucket;
+          elements.timeStartFilter.value = bucket;
+          elements.timeEndFilter.value = bucket;
+          refreshView();
+        });
+      });
+    }
+
+    function renderNoise() {
+      const groups = getNoiseGroups(state.rows);
+      elements.noiseList.innerHTML = groups.map((item) => (
+        '<div class="simple-item"><strong>' + escapeHtml(item.title) + '</strong><small>' + escapeHtml(item.note) + " · " + escapeHtml(formatNumber(item.count)) + "건</small></div>"
+      )).join("");
+    }
+
+    function renderEvidence() {
+      const evidence = state.filteredIncidents.flatMap((item) => item.evidence.slice(0, 2)).slice(0, 6);
+      if (!evidence.length) {
+        elements.evidenceList.innerHTML = '<div class="empty">대표 근거가 없습니다.</div>';
+        return;
+      }
+      elements.evidenceList.innerHTML = evidence.map((item) => (
+        '<div class="evidence-item"><strong>' + escapeHtml(typeLabel[item.type]) + '</strong><small>' + escapeHtml(shortTime(item.timestamp) + " · " + item.source_ip + " · " + item.path + " · status " + item.status_code) + "</small></div>"
+      )).join("");
+    }
+
+    function renderActions() {
+      const actions = [];
+      if (state.filteredIncidents.some((item) => item.type === "sqli")) {
+        actions.push(["외부 공격 IP 차단", "SQL Injection과 Directory Traversal에 사용된 IP를 우선 차단하고 WAF 룰을 상향합니다."]);
+      }
+      if (state.filteredIncidents.some((item) => item.type === "credential")) {
+        actions.push(["비밀번호 초기화와 세션 무효화", "로그인 성공이 확인된 계정과 유사 계정군에 대해 강제 비밀번호 변경과 세션 종료를 수행합니다."]);
+      }
+      if (state.filteredIncidents.some((item) => item.type === "insider")) {
+        actions.push(["민감 export 계정 조사", "해당 사용자, VPN 원접속지, MFA 여부, 단말 정보, 최근 권한 변경 이력을 확인합니다."]);
+      }
+      if (!actions.length) {
+        actions.push(["추가 조사 필요", "현재 필터 기준에서는 명확한 고위험 패턴이 적습니다. 파일 범위와 컬럼 구성을 다시 확인해 주세요."]);
+      }
+      elements.actionsList.innerHTML = actions.map(([title, note]) => (
+        '<div class="simple-item"><strong>' + escapeHtml(title) + '</strong><small>' + escapeHtml(note) + "</small></div>"
+      )).join("");
+    }
+
+    function renderTypeFilterOptions() {
+      const types = Array.from(new Set(state.incidents.map((item) => item.type)));
+      elements.typeFilter.innerHTML = '<option value="all">모든 유형</option>' + types.map((type) => (
+        '<option value="' + escapeHtml(type) + '">' + escapeHtml(typeLabel[type]) + "</option>"
+      )).join("");
+      elements.typeFilter.value = state.filters.type;
+    }
+
+    function refreshView() {
+      applyFilters();
+      renderMetrics();
+      renderIncidents();
+      renderDetail();
+      renderDonut();
+      renderIpBars();
+      renderTimeChart();
+      renderNoise();
+      renderEvidence();
+      renderActions();
+    }
+
+    function ingestRows(rows, fileName) {
+      state.rows = rows;
+      state.suspicious = classifyRows(rows);
+      state.incidents = summarizeIncidents(state.suspicious);
+      state.filteredSuspicious = state.suspicious.slice();
+      state.filteredIncidents = state.incidents.slice();
+      state.fileName = fileName;
+      state.selectedIncidentKey = state.incidents[0] ? state.incidents[0].key : "";
+      state.filters = { type: "all", severity: "all", start: "all", end: "all" };
+      renderTypeFilterOptions();
+      updateTimeFilterOptions();
+      refreshView();
+      setStatus(fileName + " 분석 완료", "유효 로그 " + formatNumber(rows.length) + "행, 의심 이벤트 " + formatNumber(state.suspicious.length) + "건, 사건 그룹 " + formatNumber(state.incidents.length) + "건을 분류했습니다.");
+    }
+
+    async function handleCsvText(text, fileName) {
+      try {
+        clearError();
+        setStatus("분석 중", fileName + "을 읽고 있습니다.");
+        const matrix = parseCsv(text);
+        const rows = toObjects(matrix);
+        ingestRows(rows, fileName);
+      } catch (error) {
+        setError(error.message || "CSV를 읽는 중 오류가 발생했습니다.");
+        setStatus("분석 실패", "파일 형식 또는 컬럼 구성을 확인해 주세요.");
+      }
+    }
+
+    function buildPdf(summaryLines) {
+      const safeLines = summaryLines.map((line) => String(line).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)"));
+      const commands = ["BT", "/F1 12 Tf", "50 790 Td"];
+      safeLines.forEach((line, index) => {
+        if (index > 0) commands.push("0 -18 Td");
+        commands.push("(" + line + ") Tj");
+      });
+      commands.push("ET");
+      const stream = commands.join("\n");
+
+      const objects = [];
+      objects.push("1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj");
+      objects.push("2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj");
+      objects.push("3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>endobj");
+      objects.push("4 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj");
+      objects.push("5 0 obj<< /Length " + stream.length + " >>stream\n" + stream + "\nendstream\nendobj");
+
+      let pdf = "%PDF-1.4\n";
+      const offsets = [0];
+      objects.forEach((obj) => {
+        offsets.push(pdf.length);
+        pdf += obj + "\n";
+      });
+      const xrefStart = pdf.length;
+      pdf += "xref\n0 " + (objects.length + 1) + "\n";
+      pdf += "0000000000 65535 f \n";
+      for (let i = 1; i < offsets.length; i += 1) {
+        pdf += String(offsets[i]).padStart(10, "0") + " 00000 n \n";
+      }
+      pdf += "trailer<< /Size " + (objects.length + 1) + " /Root 1 0 R >>\nstartxref\n" + xrefStart + "\n%%EOF";
+      return new Blob([pdf], { type: "application/pdf" });
+    }
+
+    function exportCsv() {
+      if (!state.filteredIncidents.length) {
+        setError("내보낼 데이터가 없습니다. 먼저 CSV를 업로드해 주세요.");
+        return;
+      }
+      const header = ["type", "severity", "title", "start", "end", "count", "ips", "users", "bytes"];
+      const lines = [header.join(",")];
+      state.filteredIncidents.forEach((item) => {
+        const row = [
+          item.type,
+          item.severity,
+          item.title,
+          item.start,
+          item.end,
+          item.count,
+          item.ips.join(" | "),
+          item.users.join(" | "),
+          item.bytes
+        ].map((value) => '"' + String(value).replaceAll('"', '""') + '"');
+        lines.push(row.join(","));
+      });
+      const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+      downloadBlob(blob, (state.fileName || "security") + "-filtered-summary.csv");
+    }
+
+    function exportPdf() {
+      if (!state.filteredIncidents.length) {
+        setError("PDF로 내보낼 데이터가 없습니다. 먼저 CSV를 업로드해 주세요.");
+        return;
+      }
+      const top = state.filteredIncidents[0];
+      const lines = [
+        "Security Dashboard Summary",
+        "File: " + (state.fileName || "-"),
+        "Suspicious logs: " + state.filteredSuspicious.length,
+        "Incident groups: " + state.filteredIncidents.length,
+        "Top incident: " + top.title + " / " + severityLabel[top.severity],
+        "Time window: " + shortTime(top.start) + " - " + shortTime(top.end),
+        "IPs: " + (top.ips.join(", ") || "-"),
+        "Users: " + (top.users.join(", ") || "-")
+      ];
+      const blob = buildPdf(lines);
+      downloadBlob(blob, (state.fileName || "security") + "-summary.pdf");
+    }
+
+    function downloadBlob(blob, fileName) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    async function loadSample() {
+      clearError();
+      try {
+        setStatus("샘플 불러오는 중", "같은 폴더의 access-logs.csv를 읽고 있습니다.");
+        const response = await fetch("./access-logs.csv");
+        if (!response.ok) throw new Error("샘플 CSV를 찾지 못했습니다.");
+        const text = await response.text();
+        await handleCsvText(text, "access-logs.csv");
+      } catch (error) {
+        setError("브라우저가 로컬 fetch를 막았거나 샘플 파일을 찾지 못했습니다. 직접 CSV를 업로드해 주세요.");
+        setStatus("샘플 자동 불러오기 실패", "파일 업로드로는 정상 동작합니다.");
+      }
+    }
+
+    function resetEmptyState() {
+      elements.metrics.innerHTML = '<div class="empty">CSV를 올리면 요약 지표가 여기에 나타납니다.</div>';
+      elements.incidentList.innerHTML = '<div class="empty">CSV를 올리면 위험한 이벤트가 여기에 나타납니다.</div>';
+      elements.detailView.innerHTML = '<div class="empty">사건을 선택하면 자세한 정보를 여기에 보여줍니다.</div>';
+      elements.donutChart.innerHTML = '<div class="empty">유형 차트가 여기에 나타납니다.</div>';
+      elements.donutLegend.innerHTML = "";
+      elements.ipBars.innerHTML = '<div class="empty">상위 공격자 IP 목록이 여기에 나타납니다.</div>';
+      elements.regionBars.innerHTML = "";
+      elements.timeChart.innerHTML = '<div class="empty">시간대 차트가 여기에 나타납니다.</div>';
+      elements.noiseList.innerHTML = '<div class="empty">정상/노이즈 분리 결과가 여기에 나타납니다.</div>';
+      elements.evidenceList.innerHTML = '<div class="empty">대표 근거가 여기에 나타납니다.</div>';
+      elements.actionsList.innerHTML = '<div class="empty">즉시 대응 권고가 여기에 나타납니다.</div>';
+    }
+
+    elements.fileInput.addEventListener("change", async (event) => {
+      const file = event.target.files && event.target.files[0];
+      if (!file) return;
+      const text = await file.text();
+      await handleCsvText(text, file.name);
+    });
+
+    ["dragenter", "dragover"].forEach((eventName) => {
+      elements.dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        elements.dropzone.classList.add("dragover");
+      });
+    });
+
+    ["dragleave", "drop"].forEach((eventName) => {
+      elements.dropzone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        elements.dropzone.classList.remove("dragover");
+      });
+    });
+
+    elements.dropzone.addEventListener("drop", async (event) => {
+      const file = event.dataTransfer && event.dataTransfer.files && event.dataTransfer.files[0];
+      if (!file) return;
+      const text = await file.text();
+      await handleCsvText(text, file.name);
+    });
+
+    elements.loadSampleBtn.addEventListener("click", loadSample);
+    elements.exportCsvBtn.addEventListener("click", exportCsv);
+    elements.exportPdfBtn.addEventListener("click", exportPdf);
+    elements.themeBtn.addEventListener("click", () => elements.body.classList.toggle("dark"));
+
+    elements.typeFilter.addEventListener("change", (event) => {
+      state.filters.type = event.target.value;
+      refreshView();
+    });
+
+    elements.severityFilter.addEventListener("change", (event) => {
+      state.filters.severity = event.target.value;
+      refreshView();
+    });
+
+    elements.timeStartFilter.addEventListener("change", (event) => {
+      state.filters.start = event.target.value;
+      refreshView();
+    });
+
+    elements.timeEndFilter.addEventListener("change", (event) => {
+      state.filters.end = event.target.value;
+      refreshView();
+    });
+
+    resetEmptyState();
+  </script>
+</body>
+</html>
