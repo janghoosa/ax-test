@@ -986,13 +986,22 @@
       const suspicious = [];
       const sqliPattern = /('|%27).*(or|union|select|drop|sleep|extractvalue|information_schema|@@version)|union\s+select|drop\s+table|sleep\(|extractvalue/i;
       const traversalPattern = /(\.\.\/|%2e%2e|%2f|etc\/passwd|etc\/shadow|id_rsa|proc\/self|var\/log\/auth\.log)/i;
-      const exportPattern = /\/api\/admin\/export|\/api\/hr\/employees\/all/i;
+      const loginPattern = /(\/api\/auth\/login|\/auth\/login|\/login|\/signin|\/sign-in|\/session\/login)/i;
+      const exportPattern = /\/api\/admin\/export|\/api\/hr\/employees\/all|\/export|\/download|\/report|\/backup/i;
+      const sensitivePattern = /salary|salaries|payroll|personal-info|employee|employees|compensation|ssn|executive|finance|pii|secret|sensitive/i;
+      const privilegedUserPattern = /(^|_)(admin|db_admin|dba|root|hr)(_|$)/i;
 
       rows.forEach((row, index) => {
         const path = row.path || "";
         const ip = row.source_ip || "";
         const ua = row.user_agent || "";
         const status = row.status_code;
+        const method = String(row.method || "").toUpperCase();
+        const userId = row.user_id || "-";
+        const isLoginRequest = loginPattern.test(path) || (/auth/i.test(path) && /login|signin|session/i.test(path));
+        const isSensitivePath = exportPattern.test(path) || sensitivePattern.test(path);
+        const isPrivilegedUser = privilegedUserPattern.test(userId);
+        const isLargeTransfer = Number(row.bytes || 0) >= 150000;
         const base = {
           id: index + 1,
           timestamp: row.timestamp,
@@ -1000,7 +1009,7 @@
           source_ip: ip,
           path,
           status_code: status,
-          user_id: row.user_id || "-",
+          user_id: userId,
           bytes: row.bytes || 0
         };
 
@@ -1014,13 +1023,29 @@
           return;
         }
 
-        if (/\/api\/auth\/login/i.test(path) && !isPrivateIp(ip)) {
-          suspicious.push({ ...base, type: "credential", severity: status === "200" ? "high" : "medium" });
+        if (isLoginRequest && (!isPrivateIp(ip) || ["401", "403", "429", "200"].includes(status))) {
+          suspicious.push({
+            ...base,
+            type: "credential",
+            severity: status === "200" ? "high" : (status === "401" || status === "403" ? "medium" : "low")
+          });
           return;
         }
 
-        if (exportPattern.test(path) || (/include=ssn|format=csv|format=xlsx|dept=executive/i.test(path) && row.user_id)) {
-          suspicious.push({ ...base, type: "insider", severity: row.bytes > 500000 ? "high" : "medium" });
+        if (
+          userId !== "-" &&
+          (
+            isSensitivePath ||
+            isLargeTransfer ||
+            isPrivilegedUser ||
+            (/get|post/i.test(method) && sensitivePattern.test(path))
+          )
+        ) {
+          suspicious.push({
+            ...base,
+            type: "insider",
+            severity: (isLargeTransfer || /ssn|salary|payroll|personal-info|finance|executive/i.test(path) || isPrivilegedUser) ? "high" : "medium"
+          });
         }
       });
 
@@ -1495,16 +1520,38 @@
         return;
       }
       const top = state.filteredIncidents[0];
+      const metrics = buildMetrics(state.rows, state.filteredSuspicious, state.filteredIncidents);
+      const topIps = getTopIps(state.filteredSuspicious).slice(0, 5);
+      const incidentLines = state.filteredIncidents.slice(0, 6).map((item, idx) =>
+        (idx + 1) + ". " + item.title + " / " + severityLabel[item.severity] + " / " + item.count + " logs / " + (item.ips[0] || "-")
+      );
       const lines = [
         "Security Dashboard Summary",
         "File: " + (state.fileName || "-"),
-        "Suspicious logs: " + state.filteredSuspicious.length,
-        "Incident groups: " + state.filteredIncidents.length,
+        "Generated: " + new Date().toISOString(),
+        "",
+        "Key Metrics",
+        ...metrics.map((item) => "- " + item.label + ": " + item.number),
+        "",
+        "Top Incident",
         "Top incident: " + top.title + " / " + severityLabel[top.severity],
         "Time window: " + shortTime(top.start) + " - " + shortTime(top.end),
         "IPs: " + (top.ips.join(", ") || "-"),
         "Users: " + (top.users.join(", ") || "-")
       ];
+      if (incidentLines.length) {
+        lines.push("", "Incident Summary", ...incidentLines);
+      }
+      if (topIps.length) {
+        lines.push("", "Top IPs", ...topIps.map(([ip, count]) => "- " + ip + ": " + count));
+      }
+      lines.push(
+        "",
+        "Actions",
+        "- Block malicious external IPs and tighten WAF rules",
+        "- Reset passwords and invalidate sessions for successful login events",
+        "- Review privileged or bulk sensitive-data access immediately"
+      );
       const blob = buildPdf(lines);
       downloadBlob(blob, (state.fileName || "security") + "-summary.pdf");
     }
